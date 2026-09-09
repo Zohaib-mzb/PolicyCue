@@ -12,14 +12,12 @@ class URLFetchError(Exception):
     pass
 
 
-async def fetch_url(url: str) -> str:
+async def fetch_url(url: str) -> tuple[str, str]:
     if not validate_url(url):
         raise URLFetchError("URL is not allowed.")
 
-    timeout = httpx.Timeout(REQUEST_TIMEOUT)
-
     async with httpx.AsyncClient(
-        timeout=timeout,
+        timeout=REQUEST_TIMEOUT,
         follow_redirects=False,
     ) as client:
         current_url = url
@@ -27,9 +25,7 @@ async def fetch_url(url: str) -> str:
         for _ in range(MAX_REDIRECTS + 1):
             response = await client.get(
                 current_url,
-                headers={
-                    "User-Agent": "PolicyLens/1.0"
-                },
+                headers={"User-Agent": "PolicyLens/1.0"},
             )
 
             if response.is_redirect:
@@ -61,21 +57,15 @@ async def fetch_url(url: str) -> str:
                 raise URLFetchError("Response is too large.")
 
             content_type = response.headers.get(
-                "content-type",
-                ""
+                "content-type", ""
             ).lower()
 
-            if not (
-                "text/html" in content_type
-                or "text/plain" in content_type
-            ):
-                raise URLFetchError(
-                    "Unsupported content type."
-                )
+            if "text/html" not in content_type and "text/plain" not in content_type:
+                raise URLFetchError("Unsupported content type.")
 
             if len(response.content) > MAX_RESPONSE_SIZE:
                 raise URLFetchError("Response is too large.")
 
-            return response.text
+            return current_url, response.text
 
         raise URLFetchError("Too many redirects.")
