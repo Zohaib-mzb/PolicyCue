@@ -49,7 +49,7 @@ def _is_private_host(hostname: str) -> bool:
     return False
 
 
-async def fetch_policy(url: str) -> str:
+def _validate_url(url: str) -> None:
     parsed = urlparse(url)
 
     if parsed.scheme not in {"http", "https"}:
@@ -61,12 +61,28 @@ async def fetch_policy(url: str) -> str:
     if _is_private_host(parsed.hostname):
         raise ValueError("Private or local URLs are not allowed.")
 
+
+async def fetch_policy(url: str) -> str:
+    _validate_url(url)
+
     async with httpx.AsyncClient(
         timeout=TIMEOUT,
         follow_redirects=False,
         headers={"User-Agent": USER_AGENT},
     ) as client:
         response = await client.get(url)
+
+    if response.is_redirect:
+        location = response.headers.get("location")
+
+        if not location:
+            raise ValueError("Redirect has no destination.")
+
+        _validate_url(location)
+
+        raise ValueError(
+            "Redirects are not allowed for security reasons."
+        )
 
     if response.status_code != 200:
         raise ValueError(
