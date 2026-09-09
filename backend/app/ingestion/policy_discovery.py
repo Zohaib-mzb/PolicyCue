@@ -7,44 +7,54 @@ from backend.app.ingestion.policy_categories import PolicyCategory
 
 KEYWORDS = {
     PolicyCategory.PRIVACY: [
+        "privacy-policy",
+        "privacy_policy",
         "privacy",
     ],
     PolicyCategory.TERMS: [
-        "terms",
         "terms-of-service",
         "terms_of_service",
+        "terms",
     ],
     PolicyCategory.COMMUNITY: [
         "community-guidelines",
         "community_guidelines",
-        "community",
+        "professional-community-policies",
     ],
     PolicyCategory.COOKIE: [
-        "cookie",
+        "cookie-policy",
+        "cookie_policy",
+        "cookies",
     ],
     PolicyCategory.DPA: [
+        "data-processing-agreement",
+        "data_processing_agreement",
         "data-processing",
-        "data_processing",
         "dpa",
     ],
     PolicyCategory.AI: [
         "ai-policy",
         "ai_policy",
-        "artificial-intelligence",
+        "artificial-intelligence-policy",
+        "artificial_intelligence_policy",
     ],
     PolicyCategory.CONTENT: [
         "content-policy",
         "content_policy",
-        "content",
+        "content-guidelines",
+        "content_guidelines",
     ],
     PolicyCategory.SAFETY: [
         "safety-policy",
         "safety_policy",
-        "safety",
+        "safety-guidelines",
+        "safety_guidelines",
     ],
     PolicyCategory.REFUND: [
-        "refund",
+        "refund-policy",
+        "refund_policy",
         "return-policy",
+        "return_policy",
     ],
     PolicyCategory.USER_AGREEMENT: [
         "user-agreement",
@@ -64,7 +74,7 @@ def discover_policy_links(
         for category in PolicyCategory
     }
 
-    base_domain = urlparse(base_url).netloc
+    base_domain = urlparse(base_url).netloc.lower()
 
     for link in soup.find_all("a", href=True):
         href = urljoin(base_url, link["href"])
@@ -73,13 +83,13 @@ def discover_policy_links(
         if parsed.scheme not in {"http", "https"}:
             continue
 
-        if parsed.netloc != base_domain:
+        if parsed.netloc.lower() != base_domain:
             continue
 
-        searchable = (
-            f"{link.get_text(' ', strip=True)} "
-            f"{parsed.path}"
-        ).lower()
+        path = parsed.path.lower().rstrip("/")
+        text = link.get_text(" ", strip=True).lower()
+
+        searchable = f"{text} {path}"
 
         for category, keywords in KEYWORDS.items():
             if any(keyword in searchable for keyword in keywords):

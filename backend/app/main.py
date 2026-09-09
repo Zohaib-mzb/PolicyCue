@@ -1,7 +1,13 @@
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, Field, HttpUrl
 from uuid import uuid4
+
+from fastapi import FastAPI, File, HTTPException, UploadFile
+from pydantic import BaseModel, Field, HttpUrl
+
 from backend.app.ingestion.chunker import chunk_text
+from backend.app.ingestion.pdf_processor import (
+    PDFProcessingError,
+    extract_pdf_text,
+)
 from backend.app.ingestion.processor import process_text, process_url
 from backend.app.retrieval.vector_store import answer_question, store_chunks
 
@@ -36,13 +42,18 @@ async def ingest_text(request: TextRequest):
     chunks = chunk_text(document["text"])
 
     document_id = str(uuid4())
-    store_chunks(document_id, chunks)
+
+    store_chunks(
+        document_id,
+        chunks,
+        source="text",
+    )
 
     return {
-    "status": "success",
-    "document_id": document_id,
-    "chunks": len(chunks),
-}
+        "status": "success",
+        "document_id": document_id,
+        "chunks": len(chunks),
+    }
 
 
 @app.post("/api/v1/ingest/url")
@@ -58,7 +69,12 @@ async def ingest_url(request: URLRequest):
     chunks = chunk_text(document["text"])
 
     document_id = str(uuid4())
-    store_chunks(document_id, chunks)
+
+    store_chunks(
+        document_id,
+        chunks,
+        source=document["url"],
+    )
 
     return {
         "status": "success",
@@ -69,6 +85,42 @@ async def ingest_url(request: URLRequest):
             category.value: urls
             for category, urls in document["policies"].items()
         },
+    }
+
+
+@app.post("/api/v1/ingest/pdf")
+async def ingest_pdf(file: UploadFile = File(...)):
+    if file.content_type != "application/pdf":
+        raise HTTPException(
+            status_code=400,
+            detail="Only PDF files are allowed.",
+        )
+
+    content = await file.read()
+
+    try:
+        text = extract_pdf_text(content)
+    except PDFProcessingError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=str(exc),
+        ) from exc
+
+    chunks = chunk_text(text)
+
+    document_id = str(uuid4())
+
+    store_chunks(
+        document_id,
+        chunks,
+        filename=file.filename,
+    )
+
+    return {
+        "status": "success",
+        "document_id": document_id,
+        "filename": file.filename,
+        "chunks": len(chunks),
     }
 
 

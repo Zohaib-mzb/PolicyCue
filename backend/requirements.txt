@@ -43,6 +43,7 @@ Pygments==2.21.0
 pypdf==6.18.0
 pytest==9.1.1
 python-dotenv==1.2.3
+python-multipart==0.0.32
 PyYAML==6.0.3
 requests==2.34.2
 requests-toolbelt==1.0.0

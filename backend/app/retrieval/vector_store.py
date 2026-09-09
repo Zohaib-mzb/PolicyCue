@@ -13,6 +13,8 @@ index = pinecone.Index(settings.pinecone_index_name)
 def store_chunks(
     document_id: str,
     chunks: list[str],
+    source: str = "",
+    filename: str | None = None,
 ) -> None:
     if not chunks:
         return
@@ -27,6 +29,8 @@ def store_chunks(
                 "document_id": document_id,
                 "text": chunk,
                 "chunk_index": i,
+                "source": source,
+                "filename": filename or "",
             },
         }
         for i, (chunk, embedding) in enumerate(
@@ -55,6 +59,8 @@ def search_chunks(
             "text": match["metadata"]["text"],
             "document_id": match["metadata"]["document_id"],
             "chunk_index": match["metadata"]["chunk_index"],
+            "source": match["metadata"].get("source", ""),
+            "filename": match["metadata"].get("filename", ""),
         }
         for match in results["matches"]
     ]
