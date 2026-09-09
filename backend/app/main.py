@@ -8,10 +8,14 @@ from backend.app.ingestion.pdf_processor import (
     PDFProcessingError,
     extract_pdf_text,
 )
+from backend.app.ingestion.policy_discovery import (
+    discover_common_policy_paths,
+)
 from backend.app.ingestion.policy_fetcher import fetch_policy
 from backend.app.ingestion.policy_validator import is_valid_policy
 from backend.app.ingestion.processor import process_text, process_url
 from backend.app.retrieval.vector_store import answer_question, store_chunks
+
 
 app = FastAPI(
     title="PolicyLens API",
@@ -61,6 +65,16 @@ async def ingest_text(request: TextRequest):
 async def ingest_url(request: URLRequest):
     try:
         document = await process_url(str(request.url))
+
+        common_policies = await discover_common_policy_paths(
+            document["url"]
+        )
+
+        for category, urls in common_policies.items():
+            for url in urls:
+                if url not in document["policies"][category]:
+                    document["policies"][category].append(url)
+
     except Exception as exc:
         raise HTTPException(
             status_code=400,
@@ -77,11 +91,12 @@ async def ingest_url(request: URLRequest):
         for url in urls:
             try:
                 text = await fetch_policy(url)
+
                 if not is_valid_policy(text, category):
                     continue
 
                 chunks = chunk_text(text)
-                
+
                 if not chunks:
                     continue
 
