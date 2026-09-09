@@ -9,9 +9,9 @@ from backend.app.ingestion.pdf_processor import (
     extract_pdf_text,
 )
 from backend.app.ingestion.policy_fetcher import fetch_policy
+from backend.app.ingestion.policy_validator import is_valid_policy
 from backend.app.ingestion.processor import process_text, process_url
 from backend.app.retrieval.vector_store import answer_question, store_chunks
-
 
 app = FastAPI(
     title="PolicyLens API",
@@ -77,8 +77,11 @@ async def ingest_url(request: URLRequest):
         for url in urls:
             try:
                 text = await fetch_policy(url)
-                chunks = chunk_text(text)
+                if not is_valid_policy(text, category):
+                    continue
 
+                chunks = chunk_text(text)
+                
                 if not chunks:
                     continue
 
