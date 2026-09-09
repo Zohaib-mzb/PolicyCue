@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     gemini_embedding_model: str
     gemini_embedding_dimension: int = 768
     secret_key: str
-
+    gemini_model: str
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

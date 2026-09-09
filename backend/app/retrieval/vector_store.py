@@ -58,3 +58,22 @@ def search_chunks(
         }
         for match in results["matches"]
     ]
+
+
+def answer_question(
+    question: str,
+    top_k: int = 5,
+) -> dict:
+    from backend.app.analysis.answer_generator import generate_answer
+
+    results = search_chunks(question, top_k)
+
+    answer = generate_answer(
+        question,
+        results,
+    )
+
+    return {
+        "answer": answer,
+        "sources": results,
+    }
