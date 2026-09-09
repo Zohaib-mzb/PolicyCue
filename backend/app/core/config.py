@@ -9,7 +9,8 @@ class Settings(BaseSettings):
     gemini_api_key: str
     pinecone_api_key: str
     pinecone_index_name: str
-
+    gemini_embedding_model: str
+    gemini_embedding_dimension: int = 768
     secret_key: str
 
     model_config = SettingsConfigDict(
