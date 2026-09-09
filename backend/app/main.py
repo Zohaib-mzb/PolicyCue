@@ -8,6 +8,7 @@ from backend.app.ingestion.pdf_processor import (
     PDFProcessingError,
     extract_pdf_text,
 )
+from backend.app.ingestion.policy_fetcher import fetch_policy
 from backend.app.ingestion.processor import process_text, process_url
 from backend.app.retrieval.vector_store import answer_question, store_chunks
 
@@ -66,25 +67,39 @@ async def ingest_url(request: URLRequest):
             detail=str(exc),
         ) from exc
 
-    chunks = chunk_text(document["text"])
-
     document_id = str(uuid4())
+    total_chunks = 0
+    fetched_policies = {}
 
-    store_chunks(
-        document_id,
-        chunks,
-        source=document["url"],
-    )
+    for category, urls in document["policies"].items():
+        fetched_policies[category.value] = []
+
+        for url in urls:
+            try:
+                text = await fetch_policy(url)
+                chunks = chunk_text(text)
+
+                if not chunks:
+                    continue
+
+                store_chunks(
+                    document_id,
+                    chunks,
+                    source=url,
+                )
+
+                total_chunks += len(chunks)
+                fetched_policies[category.value].append(url)
+
+            except Exception:
+                continue
 
     return {
         "status": "success",
         "document_id": document_id,
         "url": document["url"],
-        "chunks": len(chunks),
-        "policies": {
-            category.value: urls
-            for category, urls in document["policies"].items()
-        },
+        "chunks": total_chunks,
+        "policies": fetched_policies,
     }
 
 

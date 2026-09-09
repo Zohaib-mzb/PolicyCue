@@ -61,7 +61,13 @@ KEYWORDS = {
         "user_agreement",
     ],
 }
+def normalize_url(url: str) -> str:
+    parsed = urlparse(url)
 
+    return parsed._replace(
+        query="",
+        fragment="",
+    ).geturl().rstrip("/")
 
 def discover_policy_links(
     html: str,
@@ -77,7 +83,7 @@ def discover_policy_links(
     base_domain = urlparse(base_url).netloc.lower()
 
     for link in soup.find_all("a", href=True):
-        href = urljoin(base_url, link["href"])
+        href = normalize_url(urljoin(base_url, link["href"]))
         parsed = urlparse(href)
 
         if parsed.scheme not in {"http", "https"}:
