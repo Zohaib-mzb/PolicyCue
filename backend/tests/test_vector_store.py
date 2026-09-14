@@ -23,6 +23,7 @@ def test_store_chunks():
         store_chunks(
             document_id="test-document",
             chunks=["First chunk", "Second chunk"],
+            owner_id="owner-a",
         )
 
         mock_index.upsert.assert_called_once()
@@ -34,6 +35,8 @@ def test_store_chunks():
         assert vectors[1]["id"] == "test-document-1"
         assert vectors[0]["metadata"]["chunk_index"] == 0
         assert vectors[1]["metadata"]["chunk_index"] == 1
+        assert vectors[0]["metadata"]["owner_id"] == "owner-a"
+        assert vectors[1]["metadata"]["owner_id"] == "owner-a"
 
 
 def test_store_chunks_rejects_embedding_count_mismatch():
@@ -91,6 +94,7 @@ def test_search_chunks_filters_by_document_id():
         results = search_chunks(
             query="What is this about?",
             document_id="test-document",
+            owner_id="owner-a",
         )
 
         mock_index.query.assert_called_once()
@@ -101,9 +105,18 @@ def test_search_chunks_filters_by_document_id():
         assert call_kwargs["top_k"] == 5
         assert call_kwargs["include_metadata"] is True
         assert call_kwargs["filter"] == {
-            "document_id": {
-                "$eq": "test-document",
-            }
+            "$and": [
+                {
+                    "document_id": {
+                        "$eq": "test-document",
+                    }
+                },
+                {
+                    "owner_id": {
+                        "$eq": "owner-a",
+                    }
+                },
+            ]
         }
 
         assert len(results) == 1
@@ -127,12 +140,21 @@ def test_url_chunk_offsets_and_metadata_do_not_overwrite_other_pages():
 
 def test_delete_document_vectors_targets_only_document_id():
     with patch("backend.app.retrieval.vector_store.index") as mock_index:
-        delete_document_vectors("failed-document")
+        delete_document_vectors("failed-document", "owner-a")
 
     mock_index.delete.assert_called_once_with(
         filter={
-            "document_id": {
-                "$eq": "failed-document",
-            }
+            "$and": [
+                {
+                    "document_id": {
+                        "$eq": "failed-document",
+                    }
+                },
+                {
+                    "owner_id": {
+                        "$eq": "owner-a",
+                    }
+                },
+            ]
         },
     )

@@ -24,6 +24,7 @@ def store_chunks(
     source: str = "",
     filename: str | None = None,
     *,
+    owner_id: str | None = None,
     chunk_metadata: list[dict] | None = None,
     chunk_index_offset: int = 0,
 ) -> None:
@@ -48,6 +49,7 @@ def store_chunks(
             "values": embedding,
             "metadata": {
                 "document_id": document_id,
+                "owner_id": owner_id or "",
                 "text": chunk,
                 "chunk_index": i + chunk_index_offset,
                 "source": source,
@@ -71,12 +73,21 @@ def store_chunks(
     )
 
 
-def delete_document_vectors(document_id: str) -> None:
+def delete_document_vectors(document_id: str, owner_id: str) -> None:
     index.delete(
         filter={
-            "document_id": {
-                "$eq": document_id,
-            }
+            "$and": [
+                {
+                    "document_id": {
+                        "$eq": document_id,
+                    }
+                },
+                {
+                    "owner_id": {
+                        "$eq": owner_id,
+                    }
+                },
+            ]
         },
     )
 
@@ -85,6 +96,7 @@ def search_chunks(
     query: str,
     top_k: int = 5,
     document_id: str | None = None,
+    owner_id: str | None = None,
 ) -> list[dict]:
     query_embedding = create_query_embedding(query)
 
@@ -94,7 +106,22 @@ def search_chunks(
         "include_metadata": True,
     }
 
-    if document_id:
+    if document_id and owner_id:
+        query_args["filter"] = {
+            "$and": [
+                {
+                    "document_id": {
+                        "$eq": document_id,
+                    }
+                },
+                {
+                    "owner_id": {
+                        "$eq": owner_id,
+                    }
+                },
+            ]
+        }
+    elif document_id:
         query_args["filter"] = {
             "document_id": {
                 "$eq": document_id,
@@ -110,6 +137,7 @@ def search_chunks(
             "score": match["score"],
             "text": match["metadata"]["text"],
             "document_id": match["metadata"]["document_id"],
+            "owner_id": match["metadata"].get("owner_id", ""),
             "chunk_index": match["metadata"]["chunk_index"],
             "source": match["metadata"].get(
                 "source",
@@ -133,6 +161,7 @@ def answer_question(
     question: str,
     top_k: int = 5,
     document_id: str | None = None,
+    owner_id: str | None = None,
 ) -> dict:
     from backend.app.analysis.answer_generator import (
         generate_answer,
@@ -142,6 +171,7 @@ def answer_question(
         query=question,
         top_k=top_k,
         document_id=document_id,
+        owner_id=owner_id,
     )
 
     answer = generate_answer(

@@ -2,10 +2,11 @@ import asyncio
 import logging
 from uuid import uuid4
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, HTTPException, Request, Response, UploadFile
 from pydantic import BaseModel, Field, HttpUrl
 from google.genai.errors import ClientError
 
+from backend.app.core.session import get_or_create_owner_id, require_owner_id
 from backend.app.ingestion.chunker import chunk_text
 from backend.app.ingestion.pdf_processor import (
     PDFProcessingError,
@@ -52,17 +53,30 @@ async def health():
 
 
 @app.post("/api/v1/ingest/text")
-async def ingest_text(request: TextRequest):
+async def ingest_text(
+    request: TextRequest,
+    http_request: Request,
+    response: Response,
+):
     document = process_text(request.text)
     chunks = chunk_text(document["text"])
 
     document_id = str(uuid4())
+    owner_id = get_or_create_owner_id(http_request, response)
 
-    store_chunks(
-        document_id,
-        chunks,
-        source="text",
-    )
+    try:
+        store_chunks(
+            document_id,
+            chunks,
+            source="text",
+            owner_id=owner_id,
+        )
+    except Exception as exc:
+        _cleanup_failed_document(document_id, owner_id)
+        raise HTTPException(
+            status_code=503,
+            detail="Document storage failed. Please retry ingestion.",
+        ) from exc
 
     return {
         "status": "success",
@@ -77,9 +91,9 @@ URL_RATE_LIMIT_RETRIES = 1
 URL_RATE_LIMIT_RETRY_SECONDS = 60
 
 
-def _cleanup_failed_document(document_id: str) -> None:
+def _cleanup_failed_document(document_id: str, owner_id: str) -> None:
     try:
-        delete_document_vectors(document_id)
+        delete_document_vectors(document_id, owner_id)
     except Exception:
         logger.warning(
             "Failed to clean up vectors after ingestion failure for document_id=%s.",
@@ -88,13 +102,18 @@ def _cleanup_failed_document(document_id: str) -> None:
 
 
 @app.post("/api/v1/ingest/url")
-async def ingest_url(request: URLRequest):
+async def ingest_url(
+    request: URLRequest,
+    http_request: Request,
+    response: Response,
+):
     try:
         document = await discover_website_policies(str(request.url))
     except URLFetchError as exc:
         raise HTTPException(status_code=400, detail="Website URL is not allowed.") from exc
 
     document_id = str(uuid4())
+    owner_id = get_or_create_owner_id(http_request, response)
     chunks = []
     metadata = []
     policies = {}
@@ -124,6 +143,7 @@ async def ingest_url(request: URLRequest):
                         store_chunks,
                         document_id,
                         chunks[start:start + URL_CHUNK_BATCH_SIZE],
+                        owner_id=owner_id,
                         chunk_metadata=metadata[start:start + URL_CHUNK_BATCH_SIZE],
                         chunk_index_offset=start,
                     )
@@ -133,7 +153,7 @@ async def ingest_url(request: URLRequest):
                         raise
                     await asyncio.sleep(URL_RATE_LIMIT_RETRY_SECONDS)
     except Exception as exc:
-        _cleanup_failed_document(document_id)
+        _cleanup_failed_document(document_id, owner_id)
         raise HTTPException(
             status_code=503,
             detail="Policy storage failed. Please retry ingestion.",
@@ -153,7 +173,11 @@ async def ingest_url(request: URLRequest):
 
 
 @app.post("/api/v1/ingest/pdf")
-async def ingest_pdf(file: UploadFile = File(...)):
+async def ingest_pdf(
+    http_request: Request,
+    response: Response,
+    file: UploadFile = File(...),
+):
     if file.content_type != "application/pdf":
         raise HTTPException(
             status_code=400,
@@ -173,15 +197,17 @@ async def ingest_pdf(file: UploadFile = File(...)):
     chunks = chunk_text(text)
 
     document_id = str(uuid4())
+    owner_id = get_or_create_owner_id(http_request, response)
 
     try:
         store_chunks(
             document_id,
             chunks,
             filename=file.filename,
+            owner_id=owner_id,
         )
     except Exception as exc:
-        _cleanup_failed_document(document_id)
+        _cleanup_failed_document(document_id, owner_id)
         raise HTTPException(
             status_code=503,
             detail="Document storage failed. Please retry ingestion.",
@@ -196,9 +222,24 @@ async def ingest_pdf(file: UploadFile = File(...)):
 
 
 @app.post("/api/v1/ask")
-async def ask_question(request: QuestionRequest):
-    return answer_question(
-    request.question,
-    request.top_k,
-    request.document_id,
-)
+async def ask_question(request: QuestionRequest, http_request: Request):
+    owner_id = require_owner_id(http_request)
+    if owner_id is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Document not found.",
+        )
+
+    result = answer_question(
+        request.question,
+        request.top_k,
+        request.document_id,
+        owner_id,
+    )
+    if not result["sources"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Document not found.",
+        )
+
+    return result

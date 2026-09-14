@@ -1,8 +1,18 @@
-from backend.app.retrieval.embeddings import create_embeddings
+from backend.app.retrieval.embeddings import (
+    create_document_embeddings,
+    create_query_embedding,
+)
 
 
 def test_embedding_dimensions():
-    embeddings = create_embeddings(["Privacy Policy"])
+    documents = create_document_embeddings(
+        ["Privacy Policy"]
+    )
 
-    assert len(embeddings) == 1
-    assert len(embeddings[0]) == 768
+    query = create_query_embedding(
+        "What does the privacy policy say?"
+    )
+
+    assert len(documents) == 1
+    assert len(documents[0]) == 768
+    assert len(query) == 768
