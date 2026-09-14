@@ -8,6 +8,11 @@ from starlette.responses import Response
 
 from backend.app.main import ingest_pdf
 from backend.app.core.session import SESSION_COOKIE_NAME, create_session_token
+from backend.app.core.rate_limit import reset_rate_limits
+
+
+def setup_function():
+    reset_rate_limits()
 
 
 def _request_response(cookie: str | None = None):

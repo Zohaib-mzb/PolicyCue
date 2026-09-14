@@ -4,8 +4,9 @@ from uuid import uuid4
 
 from fastapi import FastAPI, File, HTTPException, Request, Response, UploadFile
 from pydantic import BaseModel, Field, HttpUrl
-from google.genai.errors import ClientError
 
+from backend.app.core.config import get_settings
+from backend.app.core.rate_limit import check_rate_limit
 from backend.app.core.session import get_or_create_owner_id, require_owner_id
 from backend.app.ingestion.chunker import chunk_text
 from backend.app.ingestion.pdf_processor import (
@@ -25,6 +26,7 @@ from backend.app.retrieval.vector_store import (
 
 
 logger = logging.getLogger(__name__)
+settings = get_settings()
 
 
 app = FastAPI(
@@ -58,11 +60,17 @@ async def ingest_text(
     http_request: Request,
     response: Response,
 ):
+    owner_id = get_or_create_owner_id(http_request, response)
+    check_rate_limit(
+        http_request,
+        scope="ingest",
+        limit=settings.ingestion_rate_limit,
+    )
+
     document = process_text(request.text)
     chunks = chunk_text(document["text"])
 
     document_id = str(uuid4())
-    owner_id = get_or_create_owner_id(http_request, response)
 
     try:
         store_chunks(
@@ -87,8 +95,6 @@ async def ingest_text(
 
 # Keep URL embedding/upsert requests small without changing the PDF path.
 URL_CHUNK_BATCH_SIZE = 32
-URL_RATE_LIMIT_RETRIES = 1
-URL_RATE_LIMIT_RETRY_SECONDS = 60
 
 
 def _cleanup_failed_document(document_id: str, owner_id: str) -> None:
@@ -107,13 +113,19 @@ async def ingest_url(
     http_request: Request,
     response: Response,
 ):
+    owner_id = get_or_create_owner_id(http_request, response)
+    check_rate_limit(
+        http_request,
+        scope="ingest",
+        limit=settings.ingestion_rate_limit,
+    )
+
     try:
         document = await discover_website_policies(str(request.url))
     except URLFetchError as exc:
         raise HTTPException(status_code=400, detail="Website URL is not allowed.") from exc
 
     document_id = str(uuid4())
-    owner_id = get_or_create_owner_id(http_request, response)
     chunks = []
     metadata = []
     policies = {}
@@ -137,21 +149,14 @@ async def ingest_url(
 
     try:
         for start in range(0, len(chunks), URL_CHUNK_BATCH_SIZE):
-            for attempt in range(URL_RATE_LIMIT_RETRIES + 1):
-                try:
-                    await asyncio.to_thread(
-                        store_chunks,
-                        document_id,
-                        chunks[start:start + URL_CHUNK_BATCH_SIZE],
-                        owner_id=owner_id,
-                        chunk_metadata=metadata[start:start + URL_CHUNK_BATCH_SIZE],
-                        chunk_index_offset=start,
-                    )
-                    break
-                except ClientError as exc:
-                    if exc.code != 429 or attempt == URL_RATE_LIMIT_RETRIES:
-                        raise
-                    await asyncio.sleep(URL_RATE_LIMIT_RETRY_SECONDS)
+            await asyncio.to_thread(
+                store_chunks,
+                document_id,
+                chunks[start:start + URL_CHUNK_BATCH_SIZE],
+                owner_id=owner_id,
+                chunk_metadata=metadata[start:start + URL_CHUNK_BATCH_SIZE],
+                chunk_index_offset=start,
+            )
     except Exception as exc:
         _cleanup_failed_document(document_id, owner_id)
         raise HTTPException(
@@ -184,6 +189,13 @@ async def ingest_pdf(
             detail="Only PDF files are allowed.",
         )
 
+    owner_id = get_or_create_owner_id(http_request, response)
+    check_rate_limit(
+        http_request,
+        scope="ingest",
+        limit=settings.ingestion_rate_limit,
+    )
+
     content = await file.read()
 
     try:
@@ -197,7 +209,6 @@ async def ingest_pdf(
     chunks = chunk_text(text)
 
     document_id = str(uuid4())
-    owner_id = get_or_create_owner_id(http_request, response)
 
     try:
         store_chunks(
@@ -223,6 +234,11 @@ async def ingest_pdf(
 
 @app.post("/api/v1/ask")
 async def ask_question(request: QuestionRequest, http_request: Request):
+    check_rate_limit(
+        http_request,
+        scope="ask",
+        limit=settings.ask_rate_limit,
+    )
     owner_id = require_owner_id(http_request)
     if owner_id is None:
         raise HTTPException(
@@ -230,12 +246,18 @@ async def ask_question(request: QuestionRequest, http_request: Request):
             detail="Document not found.",
         )
 
-    result = answer_question(
-        request.question,
-        request.top_k,
-        request.document_id,
-        owner_id,
-    )
+    try:
+        result = answer_question(
+            request.question,
+            request.top_k,
+            request.document_id,
+            owner_id,
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Question answering is temporarily unavailable. Please retry later.",
+        ) from exc
     if not result["sources"]:
         raise HTTPException(
             status_code=404,

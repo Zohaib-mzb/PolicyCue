@@ -1,5 +1,6 @@
 from unittest.mock import MagicMock, patch
 
+from google.genai.errors import ClientError
 import pytest
 
 from backend.app.analysis.answer_generator import (
@@ -185,3 +186,60 @@ def test_generate_answer_with_missing_response():
 
     assert answer == NO_ANSWER_MESSAGE
     mock_generate.assert_called_once()
+
+
+def test_generate_answer_retries_gemini_429_and_succeeds(monkeypatch):
+    error = ClientError(429, {"error": {"code": 429, "message": "quota"}})
+    response = MagicMock(
+        text='{"answerable": true, "answer": "LinkedIn collects profile information."}'
+    )
+
+    class Settings:
+        external_retry_attempts = 2
+        external_retry_base_delay_seconds = 0.1
+        external_retry_max_delay_seconds = 0.1
+
+    monkeypatch.setattr(
+        "backend.app.core.external_retry.get_settings",
+        lambda: Settings(),
+    )
+
+    with patch(
+        "backend.app.analysis.answer_generator.client.models.generate_content",
+        side_effect=[error, response],
+    ) as generate, patch("backend.app.core.external_retry.time.sleep") as sleep:
+        answer = generate_answer(
+            "What does LinkedIn collect?",
+            [{"text": "LinkedIn collects profile information."}],
+        )
+
+    assert answer == "LinkedIn collects profile information."
+    assert generate.call_count == 2
+    sleep.assert_called_once()
+
+
+def test_generate_answer_does_not_retry_permanent_gemini_error(monkeypatch):
+    error = ClientError(400, {"error": {"code": 400, "message": "bad request"}})
+
+    class Settings:
+        external_retry_attempts = 3
+        external_retry_base_delay_seconds = 0.1
+        external_retry_max_delay_seconds = 0.1
+
+    monkeypatch.setattr(
+        "backend.app.core.external_retry.get_settings",
+        lambda: Settings(),
+    )
+
+    with patch(
+        "backend.app.analysis.answer_generator.client.models.generate_content",
+        side_effect=error,
+    ) as generate, patch("backend.app.core.external_retry.time.sleep") as sleep:
+        with pytest.raises(ClientError):
+            generate_answer(
+                "What does LinkedIn collect?",
+                [{"text": "LinkedIn collects profile information."}],
+            )
+
+    generate.assert_called_once()
+    sleep.assert_not_called()

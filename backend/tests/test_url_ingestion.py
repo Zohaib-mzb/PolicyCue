@@ -7,8 +7,13 @@ from starlette.responses import Response
 
 from backend.app.main import URLRequest, ingest_url
 from backend.app.core.session import SESSION_COOKIE_NAME, create_session_token
+from backend.app.core.rate_limit import reset_rate_limits
 from backend.app.ingestion.policy_categories import PolicyCategory
 from backend.app.ingestion.policy_discovery import content_fingerprint
+
+
+def setup_function():
+    reset_rate_limits()
 
 
 def _request_response(cookie: str | None = None):
@@ -72,35 +77,32 @@ async def test_no_policies_does_not_claim_success_or_store_vectors():
 
 
 @pytest.mark.anyio
-@pytest.mark.parametrize("code,expected_calls", [(429, 2), (400, 1)])
-async def test_url_storage_retry_is_bounded_and_only_for_rate_limits(code, expected_calls):
+@pytest.mark.parametrize("code", [429, 400])
+async def test_url_storage_failure_returns_controlled_error_and_cleans_up(code):
     http_request, response = _request_response()
     from google.genai.errors import ClientError
     page = {"url": "https://example.com/privacy", "source_urls": ["https://example.com/privacy"], "text": "Policy content", "categories": [PolicyCategory.PRIVACY], "content_hash": "hash"}
     document = {"url": "https://example.com/", "pages": [page], "warnings": [], "skipped": {}, "candidates": 1}
     error = ClientError(code, {"error": {"code": code, "message": "test error"}})
-    with patch("backend.app.main.discover_website_policies", new=AsyncMock(return_value=document)), patch("backend.app.main.store_chunks", side_effect=error) as store, patch("backend.app.main.asyncio.sleep", new_callable=AsyncMock) as sleep, patch("backend.app.main.delete_document_vectors") as cleanup:
+    with patch("backend.app.main.discover_website_policies", new=AsyncMock(return_value=document)), patch("backend.app.main.store_chunks", side_effect=error) as store, patch("backend.app.main.delete_document_vectors") as cleanup:
         with pytest.raises(HTTPException) as caught:
             await ingest_url(URLRequest(url="https://example.com/"), http_request, response)
     assert caught.value.status_code == 503
     assert caught.value.detail == "Policy storage failed. Please retry ingestion."
-    assert store.call_count == expected_calls
-    assert sleep.await_count == expected_calls - 1
+    store.assert_called_once()
     cleanup.assert_called_once()
 
 
 @pytest.mark.anyio
-async def test_url_quota_retry_reuses_same_document_and_chunk_offset():
+async def test_url_storage_success_reuses_same_document_and_chunk_offset():
     http_request, response = _request_response()
-    from google.genai.errors import ClientError
     page = {"url": "https://example.com/privacy", "source_urls": ["https://example.com/privacy"], "text": "Policy content", "categories": [PolicyCategory.PRIVACY], "content_hash": "hash"}
     document = {"url": "https://example.com/", "pages": [page], "warnings": [], "skipped": {}, "candidates": 1}
-    error = ClientError(429, {"error": {"code": 429, "message": "quota"}})
-    with patch("backend.app.main.discover_website_policies", new=AsyncMock(return_value=document)), patch("backend.app.main.store_chunks", side_effect=[error, None]) as store, patch("backend.app.main.asyncio.sleep", new_callable=AsyncMock) as sleep:
+    with patch("backend.app.main.discover_website_policies", new=AsyncMock(return_value=document)), patch("backend.app.main.store_chunks") as store:
         result = await ingest_url(URLRequest(url="https://example.com/"), http_request, response)
     assert result["status"] == "success"
-    assert store.call_args_list[0] == store.call_args_list[1]
-    sleep.assert_awaited_once_with(60)
+    store.assert_called_once()
+    assert store.call_args.kwargs["chunk_index_offset"] == 0
 
 
 @pytest.mark.anyio

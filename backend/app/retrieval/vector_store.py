@@ -1,6 +1,7 @@
 from pinecone import Pinecone
 
 from backend.app.core.config import get_settings
+from backend.app.core.external_retry import retry_external
 from backend.app.retrieval.embeddings import (
     create_document_embeddings,
     create_query_embedding,
@@ -68,27 +69,31 @@ def store_chunks(
                     vector["metadata"][key] = metadata[key]
             vector["metadata"]["source"] = metadata.get("source_url", source)
 
-    index.upsert(
-        vectors=vectors,
+    retry_external(
+        lambda: index.upsert(
+            vectors=vectors,
+        )
     )
 
 
 def delete_document_vectors(document_id: str, owner_id: str) -> None:
-    index.delete(
-        filter={
-            "$and": [
-                {
-                    "document_id": {
-                        "$eq": document_id,
-                    }
-                },
-                {
-                    "owner_id": {
-                        "$eq": owner_id,
-                    }
-                },
-            ]
-        },
+    retry_external(
+        lambda: index.delete(
+            filter={
+                "$and": [
+                    {
+                        "document_id": {
+                            "$eq": document_id,
+                        }
+                    },
+                    {
+                        "owner_id": {
+                            "$eq": owner_id,
+                        }
+                    },
+                ]
+            },
+        )
     )
 
 
@@ -128,8 +133,10 @@ def search_chunks(
             }
         }
 
-    results = index.query(
-        **query_args,
+    results = retry_external(
+        lambda: index.query(
+            **query_args,
+        )
     )
 
     return [

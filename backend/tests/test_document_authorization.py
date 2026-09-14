@@ -8,7 +8,12 @@ from backend.app.core.session import (
     create_session_token,
     read_owner_id_from_token,
 )
+from backend.app.core.rate_limit import reset_rate_limits
 from backend.app.main import app
+
+
+def setup_function():
+    reset_rate_limits()
 
 
 def test_ingestion_issues_owner_cookie_and_stores_owner_metadata():
@@ -129,3 +134,104 @@ def test_unauthorized_responses_do_not_reveal_document_existence():
     assert existing.status_code == 404
     assert missing.status_code == 404
     assert existing.json() == missing.json() == {"detail": "Document not found."}
+
+
+def test_ask_rate_limit_returns_429_before_expensive_work():
+    owner_id = "11111111-1111-4111-8111-111111111111"
+    client = TestClient(app)
+    client.cookies.set(SESSION_COOKIE_NAME, create_session_token(owner_id))
+
+    with patch("backend.app.main.settings.ask_rate_limit", 1), patch("backend.app.main.answer_question", return_value={"answer": "ok", "sources": [{"text": "x"}]}) as answer:
+        first = client.post(
+            "/api/v1/ask",
+            json={"question": "What does it say?", "document_id": "doc-a"},
+        )
+        second = client.post(
+            "/api/v1/ask",
+            json={"question": "What does it say?", "document_id": "doc-a"},
+        )
+
+    assert first.status_code == 200
+    assert second.status_code == 429
+    assert second.headers["Retry-After"]
+    assert second.json() == {"detail": "Too many requests. Please retry later."}
+    answer.assert_called_once()
+
+
+def test_missing_session_is_still_rate_limited():
+    client = TestClient(app)
+
+    with patch("backend.app.main.settings.ask_rate_limit", 1), patch("backend.app.main.answer_question") as answer:
+        first = client.post(
+            "/api/v1/ask",
+            json={"question": "What does it say?", "document_id": "doc-a"},
+        )
+        second = client.post(
+            "/api/v1/ask",
+            json={"question": "What does it say?", "document_id": "doc-a"},
+        )
+
+    assert first.status_code == 404
+    assert second.status_code == 429
+    answer.assert_not_called()
+
+
+def test_separate_owner_ask_limits_do_not_collide():
+    owner_a = "11111111-1111-4111-8111-111111111111"
+    owner_b = "22222222-2222-4222-8222-222222222222"
+    client_a = TestClient(app)
+    client_b = TestClient(app)
+    client_a.cookies.set(SESSION_COOKIE_NAME, create_session_token(owner_a))
+    client_b.cookies.set(SESSION_COOKIE_NAME, create_session_token(owner_b))
+
+    with patch("backend.app.main.settings.ask_rate_limit", 1), patch("backend.app.main.answer_question", return_value={"answer": "ok", "sources": [{"text": "x"}]}) as answer:
+        response_a = client_a.post(
+            "/api/v1/ask",
+            json={"question": "What does it say?", "document_id": "doc-a"},
+        )
+        response_b = client_b.post(
+            "/api/v1/ask",
+            json={"question": "What does it say?", "document_id": "doc-b"},
+        )
+
+    assert response_a.status_code == 200
+    assert response_b.status_code == 200
+    assert answer.call_count == 2
+
+
+def test_generation_failure_returns_controlled_service_unavailable():
+    owner_id = "11111111-1111-4111-8111-111111111111"
+    client = TestClient(app)
+    client.cookies.set(SESSION_COOKIE_NAME, create_session_token(owner_id))
+
+    with patch("backend.app.main.answer_question", side_effect=RuntimeError("gemini unavailable")):
+        response = client.post(
+            "/api/v1/ask",
+            json={"question": "What does it say?", "document_id": "doc-a"},
+        )
+
+    assert response.status_code == 503
+    assert response.json() == {
+        "detail": "Question answering is temporarily unavailable. Please retry later."
+    }
+
+
+def test_ingestion_rate_limit_returns_429_before_processing():
+    owner_id = "11111111-1111-4111-8111-111111111111"
+    client = TestClient(app)
+    client.cookies.set(SESSION_COOKIE_NAME, create_session_token(owner_id))
+
+    with patch("backend.app.main.settings.ingestion_rate_limit", 1), patch("backend.app.main.process_text", return_value={"text": "Policy text"}) as process_text, patch("backend.app.main.chunk_text", return_value=["chunk"]), patch("backend.app.main.store_chunks"):
+        first = client.post(
+            "/api/v1/ingest/text",
+            json={"text": "Policy text"},
+        )
+        second = client.post(
+            "/api/v1/ingest/text",
+            json={"text": "Policy text"},
+        )
+
+    assert first.status_code == 200
+    assert second.status_code == 429
+    assert second.headers["Retry-After"]
+    assert process_text.call_count == 1
