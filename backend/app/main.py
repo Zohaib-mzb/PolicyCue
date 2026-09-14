@@ -1,7 +1,10 @@
+import asyncio
+import logging
 from uuid import uuid4
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from pydantic import BaseModel, Field, HttpUrl
+from google.genai.errors import ClientError
 
 from backend.app.ingestion.chunker import chunk_text
 from backend.app.ingestion.pdf_processor import (
@@ -9,12 +12,18 @@ from backend.app.ingestion.pdf_processor import (
     extract_pdf_text,
 )
 from backend.app.ingestion.policy_discovery import (
-    discover_common_policy_paths,
+    discover_website_policies,
 )
-from backend.app.ingestion.policy_fetcher import fetch_policy
-from backend.app.ingestion.policy_validator import is_valid_policy
-from backend.app.ingestion.processor import process_text, process_url
-from backend.app.retrieval.vector_store import answer_question, store_chunks
+from backend.app.ingestion.processor import process_text
+from backend.app.ingestion.url_fetcher import URLFetchError
+from backend.app.retrieval.vector_store import (
+    answer_question,
+    delete_document_vectors,
+    store_chunks,
+)
+
+
+logger = logging.getLogger(__name__)
 
 
 app = FastAPI(
@@ -25,6 +34,7 @@ app = FastAPI(
 
 class QuestionRequest(BaseModel):
     question: str = Field(min_length=1, max_length=2000)
+    document_id: str = Field(min_length=1)
     top_k: int = Field(default=5, ge=1, le=10)
 
 
@@ -61,63 +71,84 @@ async def ingest_text(request: TextRequest):
     }
 
 
+# Keep URL embedding/upsert requests small without changing the PDF path.
+URL_CHUNK_BATCH_SIZE = 32
+URL_RATE_LIMIT_RETRIES = 1
+URL_RATE_LIMIT_RETRY_SECONDS = 60
+
+
+def _cleanup_failed_document(document_id: str) -> None:
+    try:
+        delete_document_vectors(document_id)
+    except Exception:
+        logger.warning(
+            "Failed to clean up vectors after ingestion failure for document_id=%s.",
+            document_id,
+        )
+
+
 @app.post("/api/v1/ingest/url")
 async def ingest_url(request: URLRequest):
     try:
-        document = await process_url(str(request.url))
-
-        common_policies = await discover_common_policy_paths(
-            document["url"]
-        )
-
-        for category, urls in common_policies.items():
-            for url in urls:
-                if url not in document["policies"][category]:
-                    document["policies"][category].append(url)
-
-    except Exception as exc:
-        raise HTTPException(
-            status_code=400,
-            detail=str(exc),
-        ) from exc
+        document = await discover_website_policies(str(request.url))
+    except URLFetchError as exc:
+        raise HTTPException(status_code=400, detail="Website URL is not allowed.") from exc
 
     document_id = str(uuid4())
-    total_chunks = 0
-    fetched_policies = {}
+    chunks = []
+    metadata = []
+    policies = {}
+    accepted = []
+    for page in document["pages"]:
+        page_chunks = chunk_text(page["text"])
+        if not page_chunks:
+            continue
+        categories = [category.value for category in page["categories"]]
+        page_metadata = {
+            "source_url": page["url"],
+            "source_urls": page["source_urls"],
+            "policy_categories": categories,
+            "content_hash": page["content_hash"],
+        }
+        chunks.extend(page_chunks)
+        metadata.extend([page_metadata] * len(page_chunks))
+        accepted.append({**page_metadata, "chunks": len(page_chunks)})
+        for category in categories:
+            policies.setdefault(category, []).append(page["url"])
 
-    for category, urls in document["policies"].items():
-        fetched_policies[category.value] = []
-
-        for url in urls:
-            try:
-                text = await fetch_policy(url)
-
-                if not is_valid_policy(text, category):
-                    continue
-
-                chunks = chunk_text(text)
-
-                if not chunks:
-                    continue
-
-                store_chunks(
-                    document_id,
-                    chunks,
-                    source=url,
-                )
-
-                total_chunks += len(chunks)
-                fetched_policies[category.value].append(url)
-
-            except Exception:
-                continue
+    try:
+        for start in range(0, len(chunks), URL_CHUNK_BATCH_SIZE):
+            for attempt in range(URL_RATE_LIMIT_RETRIES + 1):
+                try:
+                    await asyncio.to_thread(
+                        store_chunks,
+                        document_id,
+                        chunks[start:start + URL_CHUNK_BATCH_SIZE],
+                        chunk_metadata=metadata[start:start + URL_CHUNK_BATCH_SIZE],
+                        chunk_index_offset=start,
+                    )
+                    break
+                except ClientError as exc:
+                    if exc.code != 429 or attempt == URL_RATE_LIMIT_RETRIES:
+                        raise
+                    await asyncio.sleep(URL_RATE_LIMIT_RETRY_SECONDS)
+    except Exception as exc:
+        _cleanup_failed_document(document_id)
+        raise HTTPException(
+            status_code=503,
+            detail="Policy storage failed. Please retry ingestion.",
+        ) from exc
 
     return {
-        "status": "success",
+        "status": "success" if chunks else "no_policies_found",
         "document_id": document_id,
         "url": document["url"],
-        "chunks": total_chunks,
-        "policies": fetched_policies,
+        "chunks": len(chunks),
+        "policies": policies,
+        "accepted_policies": accepted,
+        "warnings": document["warnings"],
+        "skipped": document["skipped"],
+        "candidates": document["candidates"],
     }
 
 
@@ -143,11 +174,18 @@ async def ingest_pdf(file: UploadFile = File(...)):
 
     document_id = str(uuid4())
 
-    store_chunks(
-        document_id,
-        chunks,
-        filename=file.filename,
-    )
+    try:
+        store_chunks(
+            document_id,
+            chunks,
+            filename=file.filename,
+        )
+    except Exception as exc:
+        _cleanup_failed_document(document_id)
+        raise HTTPException(
+            status_code=503,
+            detail="Document storage failed. Please retry ingestion.",
+        ) from exc
 
     return {
         "status": "success",
@@ -160,6 +198,7 @@ async def ingest_pdf(file: UploadFile = File(...)):
 @app.post("/api/v1/ask")
 async def ask_question(request: QuestionRequest):
     return answer_question(
-        request.question,
-        request.top_k,
-    )
+    request.question,
+    request.top_k,
+    request.document_id,
+)
