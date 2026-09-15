@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from fastapi import FastAPI, File, HTTPException, Request, Response, UploadFile
 from pydantic import BaseModel, Field, HttpUrl
@@ -47,6 +47,9 @@ class TextRequest(BaseModel):
 
 class URLRequest(BaseModel):
     url: HttpUrl
+
+
+DOCUMENT_NOT_FOUND_DETAIL = "Document not found."
 
 
 def _ingest_text_document(text: str, owner_id: str) -> dict:
@@ -143,6 +146,10 @@ def _ingest_pdf_document(content: bytes, filename: str | None, owner_id: str) ->
         "filename": filename,
         "chunks": len(chunks),
     }
+
+
+def _delete_owned_document(document_id: str, owner_id: str) -> None:
+    delete_document_vectors(document_id, owner_id)
 
 
 @app.get("/health")
@@ -288,7 +295,7 @@ async def ask_question(request: QuestionRequest, http_request: Request):
     if owner_id is None:
         raise HTTPException(
             status_code=404,
-            detail="Document not found.",
+            detail=DOCUMENT_NOT_FOUND_DETAIL,
         )
 
     try:
@@ -307,7 +314,47 @@ async def ask_question(request: QuestionRequest, http_request: Request):
     if not result["sources"]:
         raise HTTPException(
             status_code=404,
-            detail="Document not found.",
+            detail=DOCUMENT_NOT_FOUND_DETAIL,
         )
 
     return result
+
+
+@app.delete("/api/v1/documents/{document_id}")
+async def delete_document(document_id: str, http_request: Request):
+    check_rate_limit(
+        http_request,
+        scope="ingest",
+        limit=settings.ingestion_rate_limit,
+    )
+    owner_id = require_owner_id(http_request)
+    if owner_id is None:
+        raise HTTPException(
+            status_code=404,
+            detail=DOCUMENT_NOT_FOUND_DETAIL,
+        )
+
+    try:
+        UUID(document_id)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=404,
+            detail=DOCUMENT_NOT_FOUND_DETAIL,
+        ) from exc
+
+    try:
+        await asyncio.to_thread(
+            _delete_owned_document,
+            document_id,
+            owner_id,
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Document deletion is temporarily unavailable. Please retry later.",
+        ) from exc
+
+    return {
+        "status": "deleted",
+        "document_id": document_id,
+    }

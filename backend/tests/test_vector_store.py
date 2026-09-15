@@ -185,3 +185,27 @@ def test_pinecone_transient_upsert_failure_is_retried(monkeypatch):
         store_chunks("test-document", ["First chunk"], owner_id="owner-a")
 
     assert mock_index.upsert.call_count == 2
+
+
+def test_pinecone_transient_delete_failure_is_retried(monkeypatch):
+    class TransientError(Exception):
+        status_code = 503
+
+    class Settings:
+        external_retry_attempts = 2
+        external_retry_base_delay_seconds = 0.1
+        external_retry_max_delay_seconds = 0.1
+
+    with patch(
+        "backend.app.core.external_retry.get_settings",
+        return_value=Settings(),
+    ), patch(
+        "backend.app.core.external_retry.time.sleep"
+    ), patch(
+        "backend.app.retrieval.vector_store.index"
+    ) as mock_index:
+        mock_index.delete.side_effect = [TransientError(), None]
+
+        delete_document_vectors("test-document", "owner-a")
+
+    assert mock_index.delete.call_count == 2

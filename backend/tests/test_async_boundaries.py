@@ -18,10 +18,12 @@ from backend.app.main import (
     URLRequest,
     _ingest_pdf_document,
     _ingest_text_document,
+    _delete_owned_document,
     _prepare_url_document,
     _store_url_batch,
     app,
     ask_question,
+    delete_document,
     ingest_pdf,
     ingest_text,
     ingest_url,
@@ -177,6 +179,27 @@ async def test_rate_limit_occurs_before_expensive_thread_work():
 
     assert caught.value.status_code == 429
     to_thread.assert_not_called()
+
+
+@pytest.mark.anyio
+async def test_document_deletion_dispatches_delete_off_event_loop():
+    async def fake_to_thread(func, *args, **kwargs):
+        assert func is _delete_owned_document
+        assert args == ("33333333-3333-4333-8333-333333333333", OWNER_ID)
+        assert kwargs == {}
+        return None
+
+    with patch("backend.app.main.asyncio.to_thread", side_effect=fake_to_thread) as to_thread:
+        result = await delete_document(
+            "33333333-3333-4333-8333-333333333333",
+            _owned_request(),
+        )
+
+    assert result == {
+        "status": "deleted",
+        "document_id": "33333333-3333-4333-8333-333333333333",
+    }
+    to_thread.assert_awaited_once()
 
 
 @pytest.mark.anyio
