@@ -323,7 +323,7 @@ async def ask_question(request: QuestionRequest, http_request: Request):
             status_code=503,
             detail="Question answering is temporarily unavailable. Please retry later.",
         ) from exc
-    if not result["sources"]:
+    if not result["sources"] and not result.get("document_found"):
         raise HTTPException(
             status_code=404,
             detail=DOCUMENT_NOT_FOUND_DETAIL,
