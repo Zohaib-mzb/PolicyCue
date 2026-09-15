@@ -89,3 +89,103 @@ async def test_pdf_cleanup_failure_keeps_original_error(caplog):
     assert caught.value.status_code == 503
     assert caught.value.detail == "Document storage failed. Please retry ingestion."
     assert "failed-pdf-cleanup" in caplog.text
+
+from backend.app.main import (
+    MAX_FILENAME_METADATA_LENGTH,
+    PDF_READ_CHUNK_SIZE,
+    _read_pdf_upload,
+)
+from backend.app.ingestion.pdf_processor import MAX_PDF_SIZE
+
+
+class ChunkedAsyncFile:
+    def __init__(self, chunks):
+        self.chunks = list(chunks)
+        self.read_sizes = []
+
+    async def read(self, size=-1):
+        self.read_sizes.append(size)
+        if not self.chunks:
+            return b""
+        return self.chunks.pop(0)
+
+
+@pytest.mark.anyio
+async def test_pdf_upload_is_read_incrementally_without_unbounded_read():
+    file = ChunkedAsyncFile([b"%PDF-", b"body", b""])
+
+    content = await _read_pdf_upload(file)
+
+    assert content == b"%PDF-body"
+    assert file.read_sizes == [PDF_READ_CHUNK_SIZE, PDF_READ_CHUNK_SIZE, PDF_READ_CHUNK_SIZE]
+
+
+@pytest.mark.anyio
+async def test_oversized_upload_stops_once_byte_limit_is_exceeded():
+    file = ChunkedAsyncFile([b"a" * MAX_PDF_SIZE, b"b"])
+
+    with pytest.raises(HTTPException) as caught:
+        await _read_pdf_upload(file)
+
+    assert caught.value.status_code == 400
+    assert caught.value.detail == "PDF is too large."
+    assert file.read_sizes == [PDF_READ_CHUNK_SIZE, PDF_READ_CHUNK_SIZE]
+
+
+@pytest.mark.anyio
+async def test_oversized_pdf_upload_performs_no_parsing_or_storage():
+    http_request, response = _owned_request_response(
+        "66666666-6666-4666-8666-666666666666"
+    )
+    file = ChunkedAsyncFile([b"a" * MAX_PDF_SIZE, b"b"])
+    file.filename = "policy.pdf"
+    file.content_type = "application/pdf"
+
+    with patch("backend.app.main.extract_pdf_text") as extract, patch("backend.app.main.store_chunks") as store:
+        with pytest.raises(HTTPException) as caught:
+            await ingest_pdf(http_request, response, file)
+
+    assert caught.value.status_code == 400
+    assert caught.value.detail == "PDF is too large."
+    extract.assert_not_called()
+    store.assert_not_called()
+
+
+@pytest.mark.anyio
+async def test_content_type_alone_is_insufficient_for_pdf_ingestion():
+    http_request, response = _owned_request_response(
+        "77777777-7777-4777-8777-777777777777"
+    )
+    file = UploadFile(
+        filename="fake.pdf",
+        file=BytesIO(b"not a pdf"),
+        headers={"content-type": "application/pdf"},
+    )
+
+    with patch("backend.app.main.store_chunks") as store:
+        with pytest.raises(HTTPException) as caught:
+            await ingest_pdf(http_request, response, file)
+
+    assert caught.value.status_code == 400
+    assert caught.value.detail == "Uploaded file is not a valid PDF."
+    store.assert_not_called()
+
+
+@pytest.mark.anyio
+async def test_long_filename_metadata_is_bounded_and_not_used_as_path():
+    http_request, response = _owned_request_response(
+        "88888888-8888-4888-8888-888888888888"
+    )
+    long_filename = "../" + "a" * 400 + ".pdf"
+    file = UploadFile(
+        filename=long_filename,
+        file=BytesIO(b"%PDF"),
+        headers={"content-type": "application/pdf"},
+    )
+
+    with patch("backend.app.main.extract_pdf_text", return_value="Policy text"), patch("backend.app.main.chunk_text", return_value=["chunk"]), patch("backend.app.main.store_chunks") as store:
+        result = await ingest_pdf(http_request, response, file)
+
+    assert result["filename"] == long_filename[:MAX_FILENAME_METADATA_LENGTH]
+    assert store.call_args.kwargs["filename"] == long_filename[:MAX_FILENAME_METADATA_LENGTH]
+    assert len(store.call_args.kwargs["filename"]) == MAX_FILENAME_METADATA_LENGTH

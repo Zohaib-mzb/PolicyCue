@@ -12,6 +12,7 @@ from backend.app.core.rate_limit import check_client_rate_limit, check_rate_limi
 from backend.app.core.session import get_or_create_owner_id, require_owner_id
 from backend.app.ingestion.chunker import chunk_text
 from backend.app.ingestion.pdf_processor import (
+    MAX_PDF_SIZE,
     PDFProcessingError,
     extract_pdf_text,
 )
@@ -145,6 +146,31 @@ def _store_url_batch(
         chunk_metadata=metadata[start:start + URL_CHUNK_BATCH_SIZE],
         chunk_index_offset=start,
     )
+
+
+PDF_READ_CHUNK_SIZE = 64 * 1024
+MAX_FILENAME_METADATA_LENGTH = 255
+
+
+async def _read_pdf_upload(file: UploadFile) -> bytes:
+    content = bytearray()
+    while True:
+        chunk = await file.read(PDF_READ_CHUNK_SIZE)
+        if not chunk:
+            break
+        content.extend(chunk)
+        if len(content) > MAX_PDF_SIZE:
+            raise HTTPException(
+                status_code=400,
+                detail="PDF is too large.",
+            )
+    return bytes(content)
+
+
+def _metadata_filename(filename: str | None) -> str | None:
+    if filename is None:
+        return None
+    return filename[:MAX_FILENAME_METADATA_LENGTH]
 
 
 def _ingest_pdf_document(content: bytes, filename: str | None, owner_id: str) -> dict:
@@ -305,13 +331,14 @@ async def ingest_pdf(
         limit=settings.ingestion_owner_rate_limit,
     )
 
-    content = await file.read()
+    content = await _read_pdf_upload(file)
+    filename = _metadata_filename(file.filename)
 
     try:
         return await asyncio.to_thread(
             _ingest_pdf_document,
             content,
-            file.filename,
+            filename,
             owner_id,
         )
     except PDFProcessingError as exc:
