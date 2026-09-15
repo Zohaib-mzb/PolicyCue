@@ -3,10 +3,12 @@ import logging
 from uuid import UUID, uuid4
 
 from fastapi import FastAPI, File, HTTPException, Request, Response, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, HttpUrl
 
 from backend.app.core.config import get_settings
-from backend.app.core.rate_limit import check_rate_limit
+from backend.app.core.rate_limit import check_client_rate_limit, check_rate_limit
 from backend.app.core.session import get_or_create_owner_id, require_owner_id
 from backend.app.ingestion.chunker import chunk_text
 from backend.app.ingestion.pdf_processor import (
@@ -33,6 +35,31 @@ app = FastAPI(
     title="PolicyLens API",
     version="1.0.0",
 )
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_allowed_origins,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization"],
+)
+
+
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    return response
+
+
+@app.exception_handler(Exception)
+async def unexpected_exception_handler(request: Request, exc: Exception):
+    logger.exception("Unhandled API error.")
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error."},
+    )
 
 
 class QuestionRequest(BaseModel):
@@ -197,11 +224,16 @@ async def ingest_url(
     http_request: Request,
     response: Response,
 ):
+    check_client_rate_limit(
+        http_request,
+        scope="ingest",
+        limit=settings.ingestion_client_rate_limit,
+    )
     owner_id = get_or_create_owner_id(http_request, response)
     check_rate_limit(
         http_request,
         scope="ingest",
-        limit=settings.ingestion_rate_limit,
+        limit=settings.ingestion_owner_rate_limit,
     )
 
     try:
@@ -261,11 +293,16 @@ async def ingest_pdf(
             detail="Only PDF files are allowed.",
         )
 
+    check_client_rate_limit(
+        http_request,
+        scope="ingest",
+        limit=settings.ingestion_client_rate_limit,
+    )
     owner_id = get_or_create_owner_id(http_request, response)
     check_rate_limit(
         http_request,
         scope="ingest",
-        limit=settings.ingestion_rate_limit,
+        limit=settings.ingestion_owner_rate_limit,
     )
 
     content = await file.read()

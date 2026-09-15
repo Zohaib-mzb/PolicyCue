@@ -6,6 +6,7 @@ from starlette.requests import Request
 
 from backend.app.core.rate_limit import (
     _buckets,
+    check_client_rate_limit,
     check_rate_limit,
     reset_rate_limits,
 )
@@ -100,5 +101,62 @@ def test_stale_entries_are_cleaned_and_memory_is_bounded(monkeypatch):
         check_rate_limit(_request(host="203.0.113.3"), scope="ask", limit=2, window_seconds=10)
         check_rate_limit(_request(host="203.0.113.4"), scope="ask", limit=2, window_seconds=10)
         check_rate_limit(_request(host="203.0.113.5"), scope="ask", limit=2, window_seconds=10)
+
+    assert len(_buckets) <= 2
+
+
+def test_client_rate_limit_uses_client_bucket_even_with_different_owner_cookies():
+    owner_a = _request(_session_cookie("11111111-1111-4111-8111-111111111111"), host="203.0.113.10")
+    owner_b = _request(_session_cookie("22222222-2222-4222-8222-222222222222"), host="203.0.113.10")
+
+    check_client_rate_limit(owner_a, scope="ingest", limit=1, window_seconds=60)
+    with pytest.raises(HTTPException) as caught:
+        check_client_rate_limit(owner_b, scope="ingest", limit=1, window_seconds=60)
+
+    assert caught.value.status_code == 429
+
+
+def test_different_client_rate_limit_buckets_are_isolated():
+    client_a = _request(host="203.0.113.11")
+    client_b = _request(host="203.0.113.12")
+
+    check_client_rate_limit(client_a, scope="ingest", limit=1, window_seconds=60)
+    check_client_rate_limit(client_b, scope="ingest", limit=1, window_seconds=60)
+
+    assert len(_buckets) == 2
+
+
+def test_missing_request_client_uses_shared_bounded_fallback_bucket():
+    request_a = Request({"type": "http", "method": "POST", "path": "/", "headers": []})
+    request_b = Request({"type": "http", "method": "POST", "path": "/", "headers": []})
+
+    check_client_rate_limit(request_a, scope="ingest", limit=1, window_seconds=60)
+    with pytest.raises(HTTPException) as caught:
+        check_client_rate_limit(request_b, scope="ingest", limit=1, window_seconds=60)
+
+    assert caught.value.status_code == 429
+    assert list(_buckets) == ["ingest:client:unknown"]
+
+
+def test_client_rate_limit_retry_after_remains_correct():
+    request = _request(host="203.0.113.13")
+
+    with patch("backend.app.core.rate_limit.time.monotonic", side_effect=[10, 25]):
+        check_client_rate_limit(request, scope="ingest", limit=1, window_seconds=60)
+        with pytest.raises(HTTPException) as caught:
+            check_client_rate_limit(request, scope="ingest", limit=1, window_seconds=60)
+
+    assert caught.value.headers == {"Retry-After": "45"}
+
+
+def test_client_rate_limiter_state_remains_bounded(monkeypatch):
+    monkeypatch.setattr(
+        "backend.app.core.rate_limit.get_settings",
+        lambda: type("Settings", (), {"rate_limit_max_keys": 2})(),
+    )
+
+    check_client_rate_limit(_request(host="203.0.113.21"), scope="ingest", limit=2, window_seconds=60)
+    check_client_rate_limit(_request(host="203.0.113.22"), scope="ingest", limit=2, window_seconds=60)
+    check_client_rate_limit(_request(host="203.0.113.23"), scope="ingest", limit=2, window_seconds=60)
 
     assert len(_buckets) <= 2

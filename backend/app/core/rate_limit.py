@@ -10,13 +10,17 @@ from backend.app.core.session import require_owner_id
 _buckets: OrderedDict[str, list[float]] = OrderedDict()
 
 
+def _request_client_key(request: Request) -> str:
+    host = request.client.host if request.client else "unknown"
+    return f"client:{host}"
+
+
 def _client_key(request: Request) -> str:
     owner_id = require_owner_id(request)
     if owner_id:
         return f"owner:{owner_id}"
 
-    host = request.client.host if request.client else "unknown"
-    return f"anonymous:{host}"
+    return _request_client_key(request)
 
 
 def _cleanup(now: float, window_seconds: int, max_keys: int) -> None:
@@ -36,10 +40,9 @@ def reset_rate_limits() -> None:
     _buckets.clear()
 
 
-def check_rate_limit(
-    request: Request,
+def _check_key_rate_limit(
+    key: str,
     *,
-    scope: str,
     limit: int,
     window_seconds: int | None = None,
 ) -> None:
@@ -48,7 +51,6 @@ def check_rate_limit(
     now = time.monotonic()
     _cleanup(now, window, settings.rate_limit_max_keys)
 
-    key = f"{scope}:{_client_key(request)}"
     timestamps = [
         timestamp
         for timestamp in _buckets.get(key, [])
@@ -69,3 +71,31 @@ def check_rate_limit(
     _buckets.move_to_end(key)
     while len(_buckets) > settings.rate_limit_max_keys:
         _buckets.popitem(last=False)
+
+
+def check_rate_limit(
+    request: Request,
+    *,
+    scope: str,
+    limit: int,
+    window_seconds: int | None = None,
+) -> None:
+    _check_key_rate_limit(
+        f"{scope}:{_client_key(request)}",
+        limit=limit,
+        window_seconds=window_seconds,
+    )
+
+
+def check_client_rate_limit(
+    request: Request,
+    *,
+    scope: str,
+    limit: int,
+    window_seconds: int | None = None,
+) -> None:
+    _check_key_rate_limit(
+        f"{scope}:{_request_client_key(request)}",
+        limit=limit,
+        window_seconds=window_seconds,
+    )
