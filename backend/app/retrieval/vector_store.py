@@ -64,7 +64,7 @@ def store_chunks(
 
     if chunk_metadata is not None:
         for vector, metadata in zip(vectors, chunk_metadata):
-            for key in ("source_url", "source_urls", "policy_categories", "content_hash"):
+            for key in ("source_url", "source_urls", "policy_categories", "content_hash", "source_type", "title"):
                 if key in metadata:
                     vector["metadata"][key] = metadata[key]
             vector["metadata"]["source"] = metadata.get("source_url", source)
@@ -156,7 +156,7 @@ def search_chunks(
             ),
             **{
                 key: match["metadata"][key]
-                for key in ("source_url", "source_urls", "policy_categories", "content_hash")
+                for key in ("source_url", "source_urls", "policy_categories", "content_hash", "source_type", "title")
                 if key in match["metadata"]
             },
         }
@@ -180,11 +180,17 @@ def source_attributions(chunks: list[dict]) -> list[dict]:
             continue
         seen.add(key)
 
+        title = chunk.get("title") or ""
+        source_type = chunk.get("source_type") or ""
         item = {
             "source_url": source_url,
             "filename": filename,
             "policy_categories": categories,
         }
+        if title:
+            item["title"] = title
+        if source_type:
+            item["source_type"] = source_type
         if "source_urls" in chunk:
             item["source_urls"] = chunk["source_urls"]
         attributions.append(item)
@@ -210,6 +216,8 @@ def answer_question(
         owner_id=owner_id,
     )
 
+    document_found = bool(results)
+
     answer = generate_answer(
         question,
         results,
@@ -222,4 +230,5 @@ def answer_question(
         "answer": answer,
         "sources": results,
         "source_attributions": source_attributions(results),
+        "document_found": document_found,
     }

@@ -16,7 +16,7 @@ def setup_function():
     reset_rate_limits()
 
 
-def test_text_ingestion_route_is_not_available():
+def test_text_ingestion_route_is_available_and_validates_input():
     client = TestClient(app)
 
     response = client.post(
@@ -24,7 +24,8 @@ def test_text_ingestion_route_is_not_available():
         json={"text": "Policy text"},
     )
 
-    assert response.status_code == 404
+    assert response.status_code == 400
+    assert response.json() == {"detail": "Text is too short to analyze."}
 
 
 def test_owner_can_query_own_document():
@@ -69,6 +70,36 @@ def test_owner_cannot_query_another_owners_document():
 
     assert response.status_code == 404
     assert response.json() == {"detail": "Document not found."}
+
+
+
+
+def test_authorized_document_with_insufficient_evidence_returns_no_answer_not_404():
+    owner_id = "11111111-1111-4111-8111-111111111111"
+    client = TestClient(app)
+    client.cookies.set(SESSION_COOKIE_NAME, create_session_token(owner_id))
+
+    with patch(
+        "backend.app.main.answer_question",
+        return_value={
+            "answer": "I could not find that information in the provided document.",
+            "sources": [],
+            "source_attributions": [],
+            "document_found": True,
+        },
+    ):
+        response = client.post(
+            "/api/v1/ask",
+            json={"question": "Who won the latest FIFA World Cup?", "document_id": "doc-a"},
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "answer": "I could not find that information in the provided document.",
+        "sources": [],
+        "source_attributions": [],
+        "document_found": True,
+    }
 
 
 def test_invalid_session_cookie_fails_safely_without_lookup():

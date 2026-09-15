@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     pinecone_embedding_model: str = "llama-text-embed-v2"
     pinecone_embedding_dimension: int = 768
     gemini_embedding_model: str | None = None
+    apify_api_token: str | None = None
     gemini_embedding_dimension: int = 768
     secret_key: str
     gemini_model: str

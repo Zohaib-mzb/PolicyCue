@@ -79,6 +79,14 @@ def test_all_categories_match_links_and_substantive_content(category):
     assert category in discovery.match_categories("/legal/" + phrase.replace(" ", "-"))
 
 
+def test_known_legal_hub_paths_are_candidate_paths():
+    assert discovery.is_policy_candidate_path("/legal")
+    assert discovery.is_policy_candidate_path("/legal/")
+    assert discovery.is_policy_candidate_path("/policies")
+    assert discovery.is_policy_candidate_path("/privacy-policy")
+    assert not discovery.is_policy_candidate_path("/help")
+
+
 @pytest.mark.parametrize("url", [
     "https://other.com/privacy", "https://example.com.attacker.com/privacy",
     "https://help.example.com/privacy", "http://127.0.0.1/privacy",
@@ -155,14 +163,14 @@ async def test_multisource_discovery_deduplicates_and_survives_failures():
             raise URLFetchError("not found")
         return url, responses[url]
 
-    with patch.object(discovery, "validate_url", return_value=True), patch.object(discovery, "fetch_url", side_effect=fake_fetch) as fetch:
+    with patch.object(discovery, "validate_url", return_value=True), patch.object(discovery, "fetch_url", side_effect=fake_fetch) as fetch, patch.object(discovery, "fetch_policy_candidates_with_apify", new=AsyncMock(return_value={"used": False, "status": "not_configured", "sent": 0, "pages": []})):
         result = await discovery.discover_website_policies(BASE)
     assert len(result["pages"]) == 1
     page = result["pages"][0]
     assert page["categories"] == [PolicyCategory.PRIVACY]
     assert set(page["source_urls"]) == {BASE + "privacy", BASE + "legal/privacy-copy", BASE + "special/privacy-notice"}
     assert result["skipped"]["duplicate_content"] == 2
-    assert result["skipped"]["not_policy"] == 1
+    assert result["skipped"]["not_policy"] == 2
     assert result["warnings"]
     fetched = [call.args[0] for call in fetch.call_args_list]
     assert BASE + "ordinary-product" not in fetched

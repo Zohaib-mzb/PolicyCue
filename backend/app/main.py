@@ -72,7 +72,15 @@ class URLRequest(BaseModel):
     url: HttpUrl
 
 
+class TextIngestionRequest(BaseModel):
+    text: str
+    title: str | None = Field(default=None, max_length=255)
+
+
 DOCUMENT_NOT_FOUND_DETAIL = "Document not found."
+MIN_TEXT_CHARS = 50
+MAX_TEXT_CHARS = 100_000
+DEFAULT_TEXT_TITLE = "Pasted text"
 
 
 def _prepare_url_document(document: dict) -> tuple[list[str], list[dict], dict, list[dict]]:
@@ -139,6 +147,60 @@ def _metadata_filename(filename: str | None) -> str | None:
     if filename is None:
         return None
     return filename[:MAX_FILENAME_METADATA_LENGTH]
+
+
+def _normalize_pasted_text(text: str) -> str:
+    return text.replace("\r\n", "\n").replace("\r", "\n").strip()
+
+
+def _useful_text_length(text: str) -> int:
+    return sum(1 for char in text if not char.isspace())
+
+
+def _metadata_title(title: str | None) -> str:
+    normalized = _normalize_pasted_text(title or "")
+    return normalized[:255] or DEFAULT_TEXT_TITLE
+
+
+def _ingest_text_document(text: str, title: str | None, owner_id: str) -> dict:
+    normalized = _normalize_pasted_text(text)
+    useful_length = _useful_text_length(normalized)
+    if useful_length == 0:
+        raise HTTPException(status_code=400, detail="Text is required.")
+    if useful_length < MIN_TEXT_CHARS:
+        raise HTTPException(status_code=400, detail="Text is too short to analyze.")
+    if len(normalized) > MAX_TEXT_CHARS:
+        raise HTTPException(
+            status_code=413,
+            detail="Text is too large to paste directly. Upload it as a PDF instead.",
+        )
+
+    chunks = chunk_text(normalized)
+    document_id = str(uuid4())
+    safe_title = _metadata_title(title)
+    metadata = [{"source_type": "text", "title": safe_title} for _ in chunks]
+
+    try:
+        store_chunks(
+            document_id,
+            chunks,
+            owner_id=owner_id,
+            chunk_metadata=metadata,
+        )
+    except Exception as exc:
+        _cleanup_failed_document(document_id, owner_id)
+        raise HTTPException(
+            status_code=503,
+            detail="Text storage failed. Please retry ingestion.",
+        ) from exc
+
+    return {
+        "status": "success",
+        "document_id": document_id,
+        "source_type": "text",
+        "title": safe_title,
+        "chunks": len(chunks),
+    }
 
 
 def _ingest_pdf_document(content: bytes, filename: str | None, owner_id: str) -> dict:
@@ -252,7 +314,37 @@ async def ingest_url(
         "warnings": document["warnings"],
         "skipped": document["skipped"],
         "candidates": document["candidates"],
+        "coverage_status": document.get("coverage_status", "policies_found" if chunks else "no_policies_found"),
+        "fallback_used": document.get("fallback_used", "none"),
+        "fallback": document.get("fallback", {}),
+        "recovery_options": ["direct_policy_url", "paste_text", "upload_pdf"] if not chunks else [],
     }
+
+
+@app.post("/api/v1/ingest/text")
+async def ingest_text(
+    request: TextIngestionRequest,
+    http_request: Request,
+    response: Response,
+):
+    check_client_rate_limit(
+        http_request,
+        scope="ingest",
+        limit=settings.ingestion_client_rate_limit,
+    )
+    owner_id = get_or_create_owner_id(http_request, response)
+    check_rate_limit(
+        http_request,
+        scope="ingest",
+        limit=settings.ingestion_owner_rate_limit,
+    )
+
+    return await asyncio.to_thread(
+        _ingest_text_document,
+        request.text,
+        request.title,
+        owner_id,
+    )
 
 
 @app.post("/api/v1/ingest/pdf")

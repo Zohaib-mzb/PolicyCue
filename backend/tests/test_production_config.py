@@ -94,3 +94,9 @@ def test_production_allows_samesite_none_for_cross_site_cookie_use():
     )
 
     assert settings.session_cookie_samesite == "none"
+
+
+def test_optional_apify_token_does_not_break_settings():
+    settings = _settings(apify_api_token="configured-token-for-local-validation")
+
+    assert settings.apify_api_token == "configured-token-for-local-validation"

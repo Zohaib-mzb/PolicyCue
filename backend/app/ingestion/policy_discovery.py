@@ -11,6 +11,7 @@ from bs4 import BeautifulSoup
 from backend.app.ingestion.html_parser import extract_policy_content
 from backend.app.ingestion.policy_categories import CATEGORY_PHRASES, PolicyCategory
 from backend.app.ingestion.policy_validator import classify_policy, has_phrase, normalized_words
+from backend.app.ingestion.apify_fetcher import fetch_policy_candidates_with_apify
 from backend.app.ingestion.url_fetcher import URLFetchError, fetch_url
 from backend.app.ingestion.url_security import same_site, valid_url_shape, validate_url
 
@@ -28,14 +29,15 @@ MAX_CONCURRENT_FETCHES = 4
 DISCOVERY_DEADLINE = 180.0
 SHALLOW_PATHS = ("/legal", "/help", "/support", "/policies", "/about")
 TRACKING_PARAMETERS = {"trk", "trkinfo", "trackingid", "gclid", "fbclid", "msclkid"}
+KNOWN_POLICY_HUB_PATHS = {"/legal", "/policies"}
 
 COMMON_POLICY_PATHS = {
-    PolicyCategory.PRIVACY: ("/privacy", "/privacy-policy", "/legal/privacy", "/legal/privacy-policy"),
-    PolicyCategory.TERMS: ("/terms", "/terms-of-service", "/terms-and-conditions", "/terms-of-use", "/legal/terms", "/legal/terms-of-service"),
-    PolicyCategory.COOKIE: ("/cookie-policy", "/cookies", "/legal/cookie-policy", "/legal/cookies"),
+    PolicyCategory.PRIVACY: ("/legal-portal/privacy/privacy-policy", "/privacy", "/privacy-policy", "/legal/privacy", "/legal/privacy-policy"),
+    PolicyCategory.TERMS: ("/legal", "/legal-portal/legal-terms/terms-of-service", "/terms", "/terms-of-service", "/terms-and-conditions", "/terms-of-use", "/legal/terms", "/legal/terms-of-service"),
+    PolicyCategory.COOKIE: ("/legal-portal/privacy/cookie-policy", "/cookie-policy", "/cookies", "/legal/cookie-policy", "/legal/cookies"),
     PolicyCategory.REFUND: ("/refund-policy", "/returns", "/return-policy", "/refunds", "/legal/refund-policy"),
     PolicyCategory.SHIPPING: ("/shipping-policy", "/delivery-policy"),
-    PolicyCategory.PAYMENT: ("/payment-terms", "/pricing"),
+    PolicyCategory.PAYMENT: ("/legal-portal/legal-terms/payment-terms-of-service", "/payment-terms", "/pricing"),
     PolicyCategory.ACCEPTABLE_USE: ("/acceptable-use-policy", "/aup"),
     PolicyCategory.ACCESSIBILITY: ("/accessibility", "/accessibility-statement"),
     PolicyCategory.DISCLAIMER: ("/disclaimer",),
@@ -71,6 +73,11 @@ def match_categories(value: str) -> list[PolicyCategory]:
     words = normalized_words(unquote(value))
     return [category for category, phrases in CATEGORY_PHRASES.items()
             if any(has_phrase(words, phrase) for phrase in phrases)]
+
+
+def is_policy_candidate_path(path: str) -> bool:
+    normalized_path = unquote(path).rstrip("/").casefold() or "/"
+    return normalized_path in KNOWN_POLICY_HUB_PATHS or bool(match_categories(path))
 
 
 def resolve_url(value: str, base_url: str) -> str:
@@ -153,6 +160,8 @@ async def discover_website_policies(base_url: str) -> dict:
     fingerprints = {}
     warnings = []
     skipped = {"fetch_failed": 0, "not_policy": 0, "duplicate_content": 0}
+    failed_candidates = []
+    fallback = {"used": False, "status": "not_needed", "sent": 0, "returned": 0}
     total_chars = 0
 
     def warn(message):
@@ -184,6 +193,9 @@ async def discover_website_policies(base_url: str) -> dict:
 
     try:
         async with asyncio.timeout(DISCOVERY_DEADLINE):
+            if is_policy_candidate_path(urlparse(base_url).path):
+                add(base_url)
+
             # Input page and homepage (when different) are both useful seeds.
             for url in dict.fromkeys([base_url, origin]):
                 result = await fetch(url)
@@ -229,7 +241,7 @@ async def discover_website_policies(base_url: str) -> dict:
                             queue.append((candidate, depth + 1))
                         else:
                             warn("Sitemap depth limit reached; discovery is partial.")
-                    elif match_categories(urlparse(candidate).path):
+                    elif is_policy_candidate_path(urlparse(candidate).path):
                         add(candidate)
             if queue or inspected >= MAX_SITEMAP_URLS:
                 warn("Sitemap file or URL limit reached; discovery is partial.")
@@ -260,6 +272,8 @@ async def discover_website_policies(base_url: str) -> dict:
                 for url, result in zip(batch, results):
                     if result is None:
                         skipped["fetch_failed"] += 1
+                        if is_policy_candidate_path(urlparse(url).path):
+                            failed_candidates.append(url)
                         continue
                     final, html = result
                     text, categories = await asyncio.to_thread(
@@ -278,8 +292,11 @@ async def discover_website_policies(base_url: str) -> dict:
                         skipped["duplicate_content"] += 1
                         continue
                     if total_chars + len(text) > MAX_CORPUS_CHARACTERS:
-                        warn("Corpus size limit reached; some policies were omitted.")
-                        continue
+                        warn("Corpus size limit reached; some policy text was omitted.")
+                        remaining_chars = MAX_CORPUS_CHARACTERS - total_chars
+                        if remaining_chars <= 0:
+                            continue
+                        text = text[:remaining_chars]
                     total_chars += len(text)
                     page = {"url": aliases[0], "source_urls": aliases, "text": text,
                             "categories": categories, "content_hash": fingerprint}
@@ -287,7 +304,67 @@ async def discover_website_policies(base_url: str) -> dict:
                     pages.append(page)
     except TimeoutError:
         warn("Discovery time limit reached; results are partial.")
+    if failed_candidates:
+        fallback = await fetch_policy_candidates_with_apify(failed_candidates, base_url)
+        if fallback.get("used"):
+            if fallback.get("status") == "succeeded" and fallback.get("pages"):
+                warn("Fallback acquisition was used for access-limited policy pages.")
+            else:
+                warn("Fallback acquisition could not retrieve usable policy pages.")
+            for item in fallback.get("pages", []):
+                text = item["text"]
+                categories = await asyncio.to_thread(
+                    classify_policy,
+                    text,
+                    f"{item.get('title', '')} {text[:500]}",
+                )
+                if not categories:
+                    skipped["not_policy"] += 1
+                    continue
+                fingerprint = content_fingerprint(text)
+                aliases = list(dict.fromkeys([item["final_url"], item["source_url"]]))
+                if fingerprint in fingerprints:
+                    page = fingerprints[fingerprint]
+                    page["source_urls"] = list(dict.fromkeys(page["source_urls"] + aliases))
+                    page["categories"] = sorted(set(page["categories"]) | set(categories))
+                    skipped["duplicate_content"] += 1
+                    continue
+                if total_chars + len(text) > MAX_CORPUS_CHARACTERS:
+                    warn("Corpus size limit reached; some policy text was omitted.")
+                    remaining_chars = MAX_CORPUS_CHARACTERS - total_chars
+                    if remaining_chars <= 0:
+                        continue
+                    text = text[:remaining_chars]
+                total_chars += len(text)
+                page = {
+                    "url": aliases[0],
+                    "source_urls": aliases,
+                    "text": text,
+                    "categories": categories,
+                    "content_hash": fingerprint,
+                    "acquisition_method": "apify",
+                }
+                fingerprints[fingerprint] = page
+                pages.append(page)
     if skipped["fetch_failed"]:
         warn("Some policy candidates could not be fetched (missing, blocked, or unavailable).")
-    return {"url": base_url, "pages": pages, "warnings": warnings,
-            "skipped": skipped, "candidates": len(candidates)}
+    if pages:
+        coverage_status = "partial" if warnings or skipped["fetch_failed"] else "policies_found"
+    elif skipped["fetch_failed"] and len(candidates) > 0:
+        coverage_status = "access_limited"
+    else:
+        coverage_status = "no_policies_found"
+    return {
+        "url": base_url,
+        "pages": pages,
+        "warnings": warnings,
+        "skipped": skipped,
+        "candidates": len(candidates),
+        "coverage_status": coverage_status,
+        "fallback_used": "apify" if fallback.get("used") else "none",
+        "fallback": {
+            key: fallback.get(key)
+            for key in ("status", "sent", "returned", "duration_seconds", "usage_total_usd")
+            if key in fallback
+        },
+    }
