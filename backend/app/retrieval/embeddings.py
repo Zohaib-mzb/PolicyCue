@@ -1,38 +1,40 @@
-from google import genai
-from google.genai import types
+from pinecone import Pinecone
 
 from backend.app.core.config import get_settings
 from backend.app.core.external_retry import retry_external
 
 
 settings = get_settings()
-client = genai.Client(api_key=settings.gemini_api_key)
+pinecone = Pinecone(
+    api_key=settings.pinecone_api_key,
+)
 
 
-def _embed(texts: list[str]) -> list[list[float]]:
+def _embedding_values(embedding) -> list[float]:
+    if isinstance(embedding, dict):
+        return embedding["values"]
+    return embedding.values
+
+
+def _embed(texts: list[str], input_type: str) -> list[list[float]]:
     if not texts:
         return []
 
-    contents = [
-        types.Content(
-            parts=[types.Part.from_text(text=text)]
-        )
-        for text in texts
-    ]
-
     response = retry_external(
-        lambda: client.models.embed_content(
-            model=settings.gemini_embedding_model,
-            contents=contents,
-            config={
-                "output_dimensionality": settings.gemini_embedding_dimension,
+        lambda: pinecone.inference.embed(
+            model=settings.pinecone_embedding_model,
+            inputs=texts,
+            parameters={
+                "input_type": input_type,
+                "truncate": "END",
+                "dimension": settings.pinecone_embedding_dimension,
             },
         )
     )
 
     embeddings = [
-        embedding.values
-        for embedding in response.embeddings
+        _embedding_values(embedding)
+        for embedding in response
     ]
 
     if len(embeddings) != len(texts):
@@ -47,19 +49,10 @@ def _embed(texts: list[str]) -> list[list[float]]:
 def create_document_embeddings(
     texts: list[str],
 ) -> list[list[float]]:
-    prepared = [
-        f"title: none | text: {text}"
-        for text in texts
-    ]
-
-    return _embed(prepared)
+    return _embed(texts, input_type="passage")
 
 
 def create_query_embedding(
     query: str,
 ) -> list[float]:
-    prepared = (
-        f"task: question answering | query: {query}"
-    )
-
-    return _embed([prepared])[0]
+    return _embed([query], input_type="query")[0]

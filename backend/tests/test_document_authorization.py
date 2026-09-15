@@ -16,36 +16,15 @@ def setup_function():
     reset_rate_limits()
 
 
-def test_ingestion_issues_owner_cookie_and_stores_owner_metadata():
+def test_text_ingestion_route_is_not_available():
     client = TestClient(app)
 
-    with patch("backend.app.main.process_text", return_value={"text": "Policy text"}), patch("backend.app.main.chunk_text", return_value=["chunk"]), patch("backend.app.main.store_chunks") as store:
-        response = client.post(
-            "/api/v1/ingest/text",
-            json={"text": "Policy text"},
-        )
+    response = client.post(
+        "/api/v1/ingest/text",
+        json={"text": "Policy text"},
+    )
 
-    assert response.status_code == 200
-    token = response.cookies.get(SESSION_COOKIE_NAME)
-    owner_id = read_owner_id_from_token(token)
-    assert owner_id
-    assert store.call_args.kwargs["owner_id"] == owner_id
-
-
-def test_text_ingestion_storage_failure_cleans_up_owner_document():
-    owner_id = "11111111-1111-4111-8111-111111111111"
-    client = TestClient(app)
-    client.cookies.set(SESSION_COOKIE_NAME, create_session_token(owner_id))
-
-    with patch("backend.app.main.uuid4", return_value="failed-text-document"), patch("backend.app.main.process_text", return_value={"text": "Policy text"}), patch("backend.app.main.chunk_text", return_value=["chunk"]), patch("backend.app.main.store_chunks", side_effect=RuntimeError("upsert failed")), patch("backend.app.main.delete_document_vectors") as cleanup:
-        response = client.post(
-            "/api/v1/ingest/text",
-            json={"text": "Policy text"},
-        )
-
-    assert response.status_code == 503
-    assert response.json() == {"detail": "Document storage failed. Please retry ingestion."}
-    cleanup.assert_called_once_with("failed-text-document", owner_id)
+    assert response.status_code == 404
 
 
 def test_owner_can_query_own_document():
@@ -214,24 +193,3 @@ def test_generation_failure_returns_controlled_service_unavailable():
     assert response.json() == {
         "detail": "Question answering is temporarily unavailable. Please retry later."
     }
-
-
-def test_ingestion_rate_limit_returns_429_before_processing():
-    owner_id = "11111111-1111-4111-8111-111111111111"
-    client = TestClient(app)
-    client.cookies.set(SESSION_COOKIE_NAME, create_session_token(owner_id))
-
-    with patch("backend.app.main.settings.ingestion_rate_limit", 1), patch("backend.app.main.process_text", return_value={"text": "Policy text"}) as process_text, patch("backend.app.main.chunk_text", return_value=["chunk"]), patch("backend.app.main.store_chunks"):
-        first = client.post(
-            "/api/v1/ingest/text",
-            json={"text": "Policy text"},
-        )
-        second = client.post(
-            "/api/v1/ingest/text",
-            json={"text": "Policy text"},
-        )
-
-    assert first.status_code == 200
-    assert second.status_code == 429
-    assert second.headers["Retry-After"]
-    assert process_text.call_count == 1

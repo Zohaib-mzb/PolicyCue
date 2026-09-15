@@ -164,6 +164,34 @@ def search_chunks(
     ]
 
 
+def source_attributions(chunks: list[dict]) -> list[dict]:
+    attributions = []
+    seen = set()
+
+    for chunk in chunks:
+        source_url = chunk.get("source_url") or chunk.get("source") or ""
+        filename = chunk.get("filename") or ""
+        categories = chunk.get("policy_categories") or []
+        if isinstance(categories, str):
+            categories = [categories]
+
+        key = (source_url, filename, tuple(categories))
+        if key in seen:
+            continue
+        seen.add(key)
+
+        item = {
+            "source_url": source_url,
+            "filename": filename,
+            "policy_categories": categories,
+        }
+        if "source_urls" in chunk:
+            item["source_urls"] = chunk["source_urls"]
+        attributions.append(item)
+
+    return attributions
+
+
 def answer_question(
     question: str,
     top_k: int = 5,
@@ -171,6 +199,7 @@ def answer_question(
     owner_id: str | None = None,
 ) -> dict:
     from backend.app.analysis.answer_generator import (
+        NO_ANSWER_MESSAGE,
         generate_answer,
     )
 
@@ -186,7 +215,11 @@ def answer_question(
         results,
     )
 
+    if answer == NO_ANSWER_MESSAGE:
+        results = []
+
     return {
         "answer": answer,
         "sources": results,
+        "source_attributions": source_attributions(results),
     }

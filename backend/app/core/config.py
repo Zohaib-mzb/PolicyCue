@@ -10,7 +10,9 @@ class Settings(BaseSettings):
     gemini_api_key: str
     pinecone_api_key: str
     pinecone_index_name: str
-    gemini_embedding_model: str
+    pinecone_embedding_model: str = "llama-text-embed-v2"
+    pinecone_embedding_dimension: int = 768
+    gemini_embedding_model: str | None = None
     gemini_embedding_dimension: int = 768
     secret_key: str
     gemini_model: str
@@ -54,7 +56,7 @@ class Settings(BaseSettings):
         "gemini_api_key",
         "pinecone_api_key",
         "pinecone_index_name",
-        "gemini_embedding_model",
+        "pinecone_embedding_model",
         "secret_key",
         "gemini_model",
     )
@@ -94,7 +96,7 @@ class Settings(BaseSettings):
                 self.gemini_api_key,
                 self.pinecone_api_key,
                 self.pinecone_index_name,
-                self.gemini_embedding_model,
+                self.pinecone_embedding_model,
                 self.gemini_model,
             ):
                 if value.lower() in placeholder_values:

@@ -72,6 +72,10 @@ GROUNDING RULES:
   set answerable to false and answer to an empty string.
 - Do not return the closest related information when the actual answer is
   missing.
+- If the question contains a material qualifier, condition, category, or
+  subject, such as a specific technology, content type, person, company,
+  date, eligibility rule, or exception, the context must directly support
+  that qualified question. Broadly related policy text is not enough.
 
 ANSWER RULES:
 - Answer only what the user asked.

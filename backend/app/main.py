@@ -19,7 +19,6 @@ from backend.app.ingestion.pdf_processor import (
 from backend.app.ingestion.policy_discovery import (
     discover_website_policies,
 )
-from backend.app.ingestion.processor import process_text
 from backend.app.ingestion.url_fetcher import URLFetchError
 from backend.app.retrieval.vector_store import (
     answer_question,
@@ -69,42 +68,11 @@ class QuestionRequest(BaseModel):
     top_k: int = Field(default=5, ge=1, le=10)
 
 
-class TextRequest(BaseModel):
-    text: str = Field(min_length=1, max_length=500_000)
-
-
 class URLRequest(BaseModel):
     url: HttpUrl
 
 
 DOCUMENT_NOT_FOUND_DETAIL = "Document not found."
-
-
-def _ingest_text_document(text: str, owner_id: str) -> dict:
-    document = process_text(text)
-    chunks = chunk_text(document["text"])
-
-    document_id = str(uuid4())
-
-    try:
-        store_chunks(
-            document_id,
-            chunks,
-            source="text",
-            owner_id=owner_id,
-        )
-    except Exception as exc:
-        _cleanup_failed_document(document_id, owner_id)
-        raise HTTPException(
-            status_code=503,
-            detail="Document storage failed. Please retry ingestion.",
-        ) from exc
-
-    return {
-        "status": "success",
-        "document_id": document_id,
-        "chunks": len(chunks),
-    }
 
 
 def _prepare_url_document(document: dict) -> tuple[list[str], list[dict], dict, list[dict]]:
@@ -208,26 +176,6 @@ def _delete_owned_document(document_id: str, owner_id: str) -> None:
 @app.get("/health")
 async def health():
     return {"status": "ok"}
-
-
-@app.post("/api/v1/ingest/text")
-async def ingest_text(
-    request: TextRequest,
-    http_request: Request,
-    response: Response,
-):
-    owner_id = get_or_create_owner_id(http_request, response)
-    check_rate_limit(
-        http_request,
-        scope="ingest",
-        limit=settings.ingestion_rate_limit,
-    )
-
-    return await asyncio.to_thread(
-        _ingest_text_document,
-        request.text,
-        owner_id,
-    )
 
 
 # Keep URL embedding/upsert requests small without changing the PDF path.

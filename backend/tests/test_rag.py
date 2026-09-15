@@ -50,6 +50,9 @@ def test_answer_question():
 
     assert "email" in result["answer"]
     assert len(result["sources"]) == 1
+    assert result["source_attributions"] == [
+        {"source_url": "", "filename": "", "policy_categories": []}
+    ]
 
 
 @pytest.mark.parametrize(
@@ -243,3 +246,99 @@ def test_generate_answer_does_not_retry_permanent_gemini_error(monkeypatch):
 
     generate.assert_called_once()
     sleep.assert_not_called()
+
+
+def test_answer_question_deduplicates_url_source_attributions():
+    mock_results = [
+        {
+            "score": 0.95,
+            "text": "Terms say users must follow the rules.",
+            "document_id": "doc",
+            "owner_id": "owner-a",
+            "chunk_index": 0,
+            "source_url": "https://example.com/terms",
+            "source_urls": ["https://example.com/terms"],
+            "policy_categories": ["terms_of_service"],
+        },
+        {
+            "score": 0.94,
+            "text": "More terms text.",
+            "document_id": "doc",
+            "owner_id": "owner-a",
+            "chunk_index": 1,
+            "source_url": "https://example.com/terms",
+            "source_urls": ["https://example.com/terms"],
+            "policy_categories": ["terms_of_service"],
+        },
+    ]
+
+    with patch("backend.app.retrieval.vector_store.search_chunks", return_value=mock_results), patch(
+        "backend.app.analysis.answer_generator.generate_answer",
+        return_value="Users must follow the rules.",
+    ):
+        result = answer_question("What must users do?", document_id="doc", owner_id="owner-a")
+
+    assert result["source_attributions"] == [
+        {
+            "source_url": "https://example.com/terms",
+            "filename": "",
+            "policy_categories": ["terms_of_service"],
+            "source_urls": ["https://example.com/terms"],
+        }
+    ]
+
+
+def test_answer_question_clears_sources_when_answer_abstains():
+    mock_results = [
+        {
+            "score": 0.95,
+            "text": "Privacy policy text.",
+            "document_id": "doc",
+            "owner_id": "owner-a",
+            "chunk_index": 0,
+            "source_url": "https://example.com/privacy",
+            "policy_categories": ["privacy_policy"],
+        }
+    ]
+
+    with patch("backend.app.retrieval.vector_store.search_chunks", return_value=mock_results), patch(
+        "backend.app.analysis.answer_generator.generate_answer",
+        return_value=NO_ANSWER_MESSAGE,
+    ):
+        result = answer_question("What is the CEO salary?", document_id="doc", owner_id="owner-a")
+
+    assert result["answer"] == NO_ANSWER_MESSAGE
+    assert result["sources"] == []
+    assert result["source_attributions"] == []
+
+
+def test_generate_answer_prompt_requires_material_qualifier_support():
+    captured = {}
+
+    class Response:
+        text = '{"answerable": false, "answer": ""}'
+
+    def fake_generate_content(**kwargs):
+        captured.update(kwargs)
+        return Response()
+
+    with patch(
+        "backend.app.analysis.answer_generator.client.models.generate_content",
+        side_effect=fake_generate_content,
+    ):
+        answer = generate_answer(
+            "Are AI-generated videos eligible for monetization?",
+            [
+                {
+                    "text": (
+                        "Users have no right to receive income from User Content "
+                        "except as specifically permitted by TikTok."
+                    )
+                }
+            ],
+        )
+
+    assert answer == NO_ANSWER_MESSAGE
+    system_instruction = captured["config"].system_instruction
+    assert "material qualifier" in system_instruction
+    assert "Broadly related policy text is not enough" in system_instruction

@@ -71,7 +71,7 @@ def _set_session_cookie(response: Response, owner_id: str) -> None:
         max_age=SESSION_MAX_AGE_SECONDS,
         httponly=True,
         secure=settings.app_env == "production",
-        samesite="lax",
+        samesite=settings.session_cookie_samesite,
     )
 
 

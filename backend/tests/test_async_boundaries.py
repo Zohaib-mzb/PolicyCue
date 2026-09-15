@@ -14,10 +14,8 @@ from backend.app.core.session import SESSION_COOKIE_NAME, create_session_token
 from backend.app.ingestion.policy_categories import PolicyCategory
 from backend.app.main import (
     QuestionRequest,
-    TextRequest,
     URLRequest,
     _ingest_pdf_document,
-    _ingest_text_document,
     _delete_owned_document,
     _prepare_url_document,
     _store_url_batch,
@@ -25,7 +23,6 @@ from backend.app.main import (
     ask_question,
     delete_document,
     ingest_pdf,
-    ingest_text,
     ingest_url,
 )
 
@@ -91,25 +88,6 @@ async def test_pdf_ingestion_dispatches_processing_storage_off_event_loop():
 
     with patch("backend.app.main.asyncio.to_thread", side_effect=fake_to_thread) as to_thread:
         result = await ingest_pdf(_owned_request(), Response(), file)
-
-    assert result["status"] == "success"
-    to_thread.assert_awaited_once()
-
-
-@pytest.mark.anyio
-async def test_text_ingestion_dispatches_processing_storage_off_event_loop():
-    async def fake_to_thread(func, *args, **kwargs):
-        assert func is _ingest_text_document
-        assert args == ("Policy text", OWNER_ID)
-        assert kwargs == {}
-        return {"status": "success", "document_id": "doc-a", "chunks": 1}
-
-    with patch("backend.app.main.asyncio.to_thread", side_effect=fake_to_thread) as to_thread:
-        result = await ingest_text(
-            TextRequest(text="Policy text"),
-            _owned_request(),
-            Response(),
-        )
 
     assert result["status"] == "success"
     to_thread.assert_awaited_once()
