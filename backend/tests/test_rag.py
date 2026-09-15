@@ -53,6 +53,7 @@ def test_answer_question():
     assert result["source_attributions"] == [
         {"source_url": "", "filename": "", "policy_categories": []}
     ]
+    assert result["document_found"] is True
 
 
 @pytest.mark.parametrize(
@@ -310,6 +311,7 @@ def test_answer_question_clears_sources_when_answer_abstains():
     assert result["answer"] == NO_ANSWER_MESSAGE
     assert result["sources"] == []
     assert result["source_attributions"] == []
+    assert result["document_found"] is True
 
 
 def test_generate_answer_prompt_requires_material_qualifier_support():
