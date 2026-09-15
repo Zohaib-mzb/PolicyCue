@@ -49,25 +49,8 @@ class URLRequest(BaseModel):
     url: HttpUrl
 
 
-@app.get("/health")
-async def health():
-    return {"status": "ok"}
-
-
-@app.post("/api/v1/ingest/text")
-async def ingest_text(
-    request: TextRequest,
-    http_request: Request,
-    response: Response,
-):
-    owner_id = get_or_create_owner_id(http_request, response)
-    check_rate_limit(
-        http_request,
-        scope="ingest",
-        limit=settings.ingestion_rate_limit,
-    )
-
-    document = process_text(request.text)
+def _ingest_text_document(text: str, owner_id: str) -> dict:
+    document = process_text(text)
     chunks = chunk_text(document["text"])
 
     document_id = str(uuid4())
@@ -91,6 +74,100 @@ async def ingest_text(
         "document_id": document_id,
         "chunks": len(chunks),
     }
+
+
+def _prepare_url_document(document: dict) -> tuple[list[str], list[dict], dict, list[dict]]:
+    chunks = []
+    metadata = []
+    policies = {}
+    accepted = []
+    for page in document["pages"]:
+        page_chunks = chunk_text(page["text"])
+        if not page_chunks:
+            continue
+        categories = [category.value for category in page["categories"]]
+        page_metadata = {
+            "source_url": page["url"],
+            "source_urls": page["source_urls"],
+            "policy_categories": categories,
+            "content_hash": page["content_hash"],
+        }
+        chunks.extend(page_chunks)
+        metadata.extend([page_metadata] * len(page_chunks))
+        accepted.append({**page_metadata, "chunks": len(page_chunks)})
+        for category in categories:
+            policies.setdefault(category, []).append(page["url"])
+
+    return chunks, metadata, policies, accepted
+
+
+def _store_url_batch(
+    document_id: str,
+    chunks: list[str],
+    metadata: list[dict],
+    owner_id: str,
+    start: int,
+) -> None:
+    store_chunks(
+        document_id,
+        chunks[start:start + URL_CHUNK_BATCH_SIZE],
+        owner_id=owner_id,
+        chunk_metadata=metadata[start:start + URL_CHUNK_BATCH_SIZE],
+        chunk_index_offset=start,
+    )
+
+
+def _ingest_pdf_document(content: bytes, filename: str | None, owner_id: str) -> dict:
+    text = extract_pdf_text(content)
+    chunks = chunk_text(text)
+
+    document_id = str(uuid4())
+
+    try:
+        store_chunks(
+            document_id,
+            chunks,
+            filename=filename,
+            owner_id=owner_id,
+        )
+    except Exception as exc:
+        _cleanup_failed_document(document_id, owner_id)
+        raise HTTPException(
+            status_code=503,
+            detail="Document storage failed. Please retry ingestion.",
+        ) from exc
+
+    return {
+        "status": "success",
+        "document_id": document_id,
+        "filename": filename,
+        "chunks": len(chunks),
+    }
+
+
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
+
+
+@app.post("/api/v1/ingest/text")
+async def ingest_text(
+    request: TextRequest,
+    http_request: Request,
+    response: Response,
+):
+    owner_id = get_or_create_owner_id(http_request, response)
+    check_rate_limit(
+        http_request,
+        scope="ingest",
+        limit=settings.ingestion_rate_limit,
+    )
+
+    return await asyncio.to_thread(
+        _ingest_text_document,
+        request.text,
+        owner_id,
+    )
 
 
 # Keep URL embedding/upsert requests small without changing the PDF path.
@@ -126,39 +203,27 @@ async def ingest_url(
         raise HTTPException(status_code=400, detail="Website URL is not allowed.") from exc
 
     document_id = str(uuid4())
-    chunks = []
-    metadata = []
-    policies = {}
-    accepted = []
-    for page in document["pages"]:
-        page_chunks = chunk_text(page["text"])
-        if not page_chunks:
-            continue
-        categories = [category.value for category in page["categories"]]
-        page_metadata = {
-            "source_url": page["url"],
-            "source_urls": page["source_urls"],
-            "policy_categories": categories,
-            "content_hash": page["content_hash"],
-        }
-        chunks.extend(page_chunks)
-        metadata.extend([page_metadata] * len(page_chunks))
-        accepted.append({**page_metadata, "chunks": len(page_chunks)})
-        for category in categories:
-            policies.setdefault(category, []).append(page["url"])
+    chunks, metadata, policies, accepted = await asyncio.to_thread(
+        _prepare_url_document,
+        document,
+    )
 
     try:
         for start in range(0, len(chunks), URL_CHUNK_BATCH_SIZE):
             await asyncio.to_thread(
-                store_chunks,
+                _store_url_batch,
                 document_id,
-                chunks[start:start + URL_CHUNK_BATCH_SIZE],
-                owner_id=owner_id,
-                chunk_metadata=metadata[start:start + URL_CHUNK_BATCH_SIZE],
-                chunk_index_offset=start,
+                chunks,
+                metadata,
+                owner_id,
+                start,
             )
     except Exception as exc:
-        _cleanup_failed_document(document_id, owner_id)
+        await asyncio.to_thread(
+            _cleanup_failed_document,
+            document_id,
+            owner_id,
+        )
         raise HTTPException(
             status_code=503,
             detail="Policy storage failed. Please retry ingestion.",
@@ -199,37 +264,17 @@ async def ingest_pdf(
     content = await file.read()
 
     try:
-        text = extract_pdf_text(content)
+        return await asyncio.to_thread(
+            _ingest_pdf_document,
+            content,
+            file.filename,
+            owner_id,
+        )
     except PDFProcessingError as exc:
         raise HTTPException(
             status_code=400,
             detail=str(exc),
         ) from exc
-
-    chunks = chunk_text(text)
-
-    document_id = str(uuid4())
-
-    try:
-        store_chunks(
-            document_id,
-            chunks,
-            filename=file.filename,
-            owner_id=owner_id,
-        )
-    except Exception as exc:
-        _cleanup_failed_document(document_id, owner_id)
-        raise HTTPException(
-            status_code=503,
-            detail="Document storage failed. Please retry ingestion.",
-        ) from exc
-
-    return {
-        "status": "success",
-        "document_id": document_id,
-        "filename": file.filename,
-        "chunks": len(chunks),
-    }
 
 
 @app.post("/api/v1/ask")
@@ -247,7 +292,8 @@ async def ask_question(request: QuestionRequest, http_request: Request):
         )
 
     try:
-        result = answer_question(
+        result = await asyncio.to_thread(
+            answer_question,
             request.question,
             request.top_k,
             request.document_id,
