@@ -47,7 +47,7 @@ async def test_native_success_does_not_call_apify():
 
     assert result["pages"]
     assert result["fallback_used"] == "none"
-    assert result["coverage_status"] == "partial"
+    assert result["coverage_status"] == "policies_found"
     apify.assert_not_called()
 
 
@@ -88,9 +88,37 @@ async def test_low_confidence_failed_candidate_not_sent_to_apify():
     ), patch("backend.app.ingestion.policy_discovery.fetch_policy_candidates_with_apify", new=AsyncMock(return_value={"used": False})) as apify:
         result = await discover_website_policies("https://example.com/random-page")
 
-    sent = apify.call_args.args[0]
-    assert "https://example.com/random-page" not in sent
-    assert result["coverage_status"] == "access_limited"
+    apify.assert_not_called()
+    assert result["coverage_status"] == "no_policies_found"
+
+
+@pytest.mark.anyio
+async def test_speculative_common_path_failures_do_not_trigger_fallback_or_partial_coverage():
+    privacy_html = "<main><h1>Privacy Policy</h1>" + (
+        "We collect personal information, use personal data, retain records, and provide privacy choices to users. " * 12
+    ) + "</main>"
+    terms_html = "<main><h1>Terms of Service</h1>" + (
+        "Users must comply with these terms, and the service may restrict access for violations of this agreement. " * 12
+    ) + "</main>"
+    homepage = '<a href="/privacy">Privacy Policy</a><a href="/terms">Terms of Service</a>'
+
+    async def fake_fetch(url, **kwargs):
+        if url == "https://example.com/":
+            return url, homepage
+        if url == "https://example.com/privacy":
+            return url, privacy_html
+        if url == "https://example.com/terms":
+            return url, terms_html
+        return None
+
+    with patch("backend.app.ingestion.policy_discovery.validate_url", return_value=True), patch(
+        "backend.app.ingestion.policy_discovery.fetch_url", side_effect=fake_fetch
+    ), patch("backend.app.ingestion.policy_discovery.fetch_policy_candidates_with_apify", new=AsyncMock()) as apify:
+        result = await discover_website_policies("https://example.com/")
+
+    apify.assert_not_called()
+    assert result["pages"]
+    assert result["coverage_status"] == "policies_found"
 
 
 @pytest.mark.anyio
