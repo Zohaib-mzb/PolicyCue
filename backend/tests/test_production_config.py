@@ -21,23 +21,23 @@ def _settings(**overrides):
 
 def test_cors_origins_parse_from_comma_separated_env_value():
     settings = _settings(
-        cors_allowed_origins="http://localhost:5173, https://policylens.vercel.app "
+        cors_allowed_origins="http://localhost:5173, https://policycue.vercel.app "
     )
 
     assert settings.cors_allowed_origins == [
         "http://localhost:5173",
-        "https://policylens.vercel.app",
+        "https://policycue.vercel.app",
     ]
 
 
 def test_production_accepts_explicit_origins_and_strong_secret():
     settings = _settings(
         app_env="production",
-        cors_allowed_origins="https://policylens.vercel.app",
+        cors_allowed_origins="https://policycue.vercel.app",
     )
 
     assert settings.app_env == "production"
-    assert settings.cors_allowed_origins == ["https://policylens.vercel.app"]
+    assert settings.cors_allowed_origins == ["https://policycue.vercel.app"]
 
 
 @pytest.mark.parametrize(
@@ -49,7 +49,7 @@ def test_production_rejects_weak_or_placeholder_secret(secret_key):
         _settings(
             app_env="production",
             secret_key=secret_key,
-            cors_allowed_origins="https://policylens.vercel.app",
+            cors_allowed_origins="https://policycue.vercel.app",
         )
 
 
@@ -71,7 +71,7 @@ def test_production_rejects_placeholder_external_service_config(field_name):
     with pytest.raises(ValidationError):
         _settings(
             app_env="production",
-            cors_allowed_origins="https://policylens.vercel.app",
+            cors_allowed_origins="https://policycue.vercel.app",
             **{field_name: "YOUR_KEY"},
         )
 
@@ -90,7 +90,7 @@ def test_production_allows_samesite_none_for_cross_site_cookie_use():
     settings = _settings(
         app_env="production",
         session_cookie_samesite="none",
-        cors_allowed_origins="https://policylens.vercel.app",
+        cors_allowed_origins="https://policycue.vercel.app",
     )
 
     assert settings.session_cookie_samesite == "none"

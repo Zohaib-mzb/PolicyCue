@@ -45,6 +45,31 @@ app.add_middleware(
 )
 
 
+PROTECTED_BROWSER_METHODS = {"POST", "DELETE"}
+
+
+@app.middleware("http")
+async def enforce_production_origin(request: Request, call_next):
+    """Reject cross-site cookie requests before they can mutate owner data.
+
+    CORS controls whether a browser may read a response; it does not prevent a
+    browser from sending a credentialed request.  Production uses an explicit
+    allowlist and requires its Origin for cookie-authenticated API mutations.
+    OPTIONS remains available to CORSMiddleware for normal preflight handling.
+    """
+    if (
+        settings.app_env == "production"
+        and request.method in PROTECTED_BROWSER_METHODS
+        and request.url.path.startswith("/api/v1/")
+        and request.headers.get("origin") not in settings.cors_allowed_origins
+    ):
+        return JSONResponse(
+            status_code=403,
+            content={"detail": "Request origin is not allowed."},
+        )
+    return await call_next(request)
+
+
 @app.middleware("http")
 async def add_security_headers(request: Request, call_next):
     response = await call_next(request)
