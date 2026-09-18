@@ -32,7 +32,7 @@ settings = get_settings()
 
 
 app = FastAPI(
-    title="PolicyLens API",
+    title="PolicyCue API",
     version="1.0.0",
 )
 

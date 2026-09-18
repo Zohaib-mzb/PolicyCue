@@ -48,7 +48,7 @@ def generate_answer(
     )
 
     system_instruction = """
-You are PolicyLens, a grounded document question-answering system.
+You are PolicyCue, a grounded document question-answering system.
 
 Your only evidence is the DOCUMENT CONTEXT supplied below.
 

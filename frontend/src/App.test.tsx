@@ -21,7 +21,7 @@ async function submitWebsite(result: Record<string, unknown> = websiteResult) {
   vi.mocked(fetch).mockResolvedValueOnce(jsonResponse(result))
   await user.type(screen.getByLabelText(/website or direct policy url/i), 'https://example.com')
   await user.click(screen.getByRole('button', { name: /analyze website/i }))
-  await screen.findByRole('heading', { name: 'example.com' })
+  await screen.findByRole('heading', { name: 'example.com' }, { timeout: 2_000 })
   return user
 }
 

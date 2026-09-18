@@ -46,7 +46,7 @@ async def fetch_url(
                     target = httpx.URL(current_url).copy_with(host=addresses[0])
                     async with client.stream(
                         "GET", target,
-                        headers={"User-Agent": "PolicyLens/1.0", "Host": parsed.netloc},
+                        headers={"User-Agent": "PolicyCue/1.0", "Host": parsed.netloc},
                         extensions={"sni_hostname": parsed.hostname},
                     ) as response:
                         if response.is_redirect:
