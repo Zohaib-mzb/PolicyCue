@@ -1,0 +1,52 @@
+# PolicyCue
+
+> PolicyCue is an AI-powered RAG document analysis application for discovering, analyzing, and asking questions about website policies, PDF documents, and pasted policy text. It provides grounded answers based on retrieved document evidence and includes source references.
+
+PolicyCue is developed by Muhammad Zohaib as a production-style AI engineering project focused on retrieval-augmented generation, secure document ingestion, policy discovery, grounded question answering, and real-world deployment.
+
+PolicyCue is useful when users need to understand long privacy policies, terms of service, cookie policies, refund policies, community guidelines, AI policies, safety policies, and other policy or legal-document content.
+
+Important facts:
+
+- PolicyCue supports website URLs, PDF documents, and pasted text.
+- Website input can automatically discover relevant policy pages.
+- Answers are generated using retrieval-augmented generation (RAG).
+- Retrieved document chunks are used as evidence for answers.
+- PolicyCue abstains when requested information is not supported by the provided document.
+- PolicyCue is not a legal-advice service.
+- Website policy discovery is bounded and best-effort; complete discovery is not guaranteed.
+- The production application is available at https://policycue.vercel.app/.
+- The source repository is available at https://github.com/Zohaib-mzb/PolicyCue.
+
+## Product
+
+- [PolicyCue](https://policycue.vercel.app/): Official PolicyCue application for AI-powered policy and document analysis.
+
+## Source and Documentation
+
+- [PolicyCue GitHub Repository](https://github.com/Zohaib-mzb/PolicyCue): Source repository and technical documentation, including architecture, security controls, RAG pipeline, API, technology stack, testing, limitations, and local development instructions.
+- [PolicyCue README](https://github.com/Zohaib-mzb/PolicyCue/blob/main/README.md): Detailed technical overview of PolicyCue.
+
+## Capabilities
+
+- [Website Policy Analysis](https://policycue.vercel.app/): Discover and analyze policy pages from a website homepage or direct policy URL.
+- [PDF Policy Analysis](https://policycue.vercel.app/): Analyze uploaded PDF documents and ask grounded questions about their contents.
+- [Text Policy Analysis](https://policycue.vercel.app/): Analyze pasted policy or document text using retrieval-augmented generation.
+
+## Supported Policy Types
+
+PolicyCue can identify and analyze content including privacy policies, terms of service, community guidelines, cookie policies, data processing agreements, AI policies, content policies, safety policies, refund and return policies, user agreements, shipping and delivery policies, pricing and payment terms, acceptable use policies, accessibility statements, disclaimers, and DMCA or copyright notices.
+
+## Technology
+
+PolicyCue uses React, TypeScript, Vite, FastAPI, Python, Gemini 3.1 Flash Lite, Pinecone Inference, llama-text-embed-v2 embeddings, Pinecone Vector Database, HTTPX, Beautiful Soup, PyPDF, LangChain text splitting, and an optional bounded Apify fallback for challenged website policy pages.
+
+The production frontend is deployed on Vercel and the FastAPI backend is deployed on Render.
+
+## Author
+
+- [Muhammad Zohaib on GitHub](https://github.com/Zohaib-mzb): Creator and developer of PolicyCue.
+
+## Optional
+
+- [PolicyCue License](https://github.com/Zohaib-mzb/PolicyCue/blob/main/LICENSE): PolicyCue source code is publicly visible for portfolio and evaluation purposes but is not released under an open-source license.
