@@ -108,6 +108,36 @@ describe('PolicyCue application', () => {
     expect(screen.getByRole('button', { name: 'Paste text' })).toBeInTheDocument()
   })
 
+  it.each([
+    ['Direct policy URL', 'Website'],
+    ['Paste text', 'Paste Text'],
+    ['Upload PDF', 'PDF'],
+  ])('deletes the active document before switching to %s', async (action, targetTab) => {
+    const user = await submitWebsite({ ...websiteResult, coverage_status: 'partial', chunks: 2 })
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ status: 'deleted', document_id: websiteResult.document_id }))
+
+    await user.click(screen.getByRole('button', { name: action }))
+
+    const target = await screen.findByRole('tab', { name: targetTab })
+    expect(target).toHaveAttribute('aria-selected', 'true')
+    const deleteCalls = vi.mocked(fetch).mock.calls.filter(([url, init]) => String(url).includes(`/documents/${websiteResult.document_id}`) && (init as RequestInit).method === 'DELETE')
+    expect(deleteCalls).toHaveLength(1)
+    expect(deleteCalls[0][1]).toEqual(expect.objectContaining({ credentials: 'include' }))
+    expect(screen.queryByRole('heading', { name: 'example.com' })).not.toBeInTheDocument()
+  })
+
+  it('keeps the workspace in place when a recovery deletion fails', async () => {
+    const user = await submitWebsite({ ...websiteResult, coverage_status: 'partial', chunks: 2 })
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ detail: 'Document deletion is temporarily unavailable. Please retry later.' }, 503))
+
+    await user.click(screen.getByRole('button', { name: 'Upload PDF' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/temporarily unavailable/i)
+    expect(screen.getByRole('heading', { name: 'example.com' })).toBeInTheDocument()
+    expect(screen.queryByLabelText('Choose PDF file')).not.toBeInTheDocument()
+    expect(vi.mocked(fetch).mock.calls.filter(([url]) => String(url).includes('/documents/'))).toHaveLength(1)
+  })
+
   it('asks a question and displays genuine, safe source attribution', async () => {
     const user = await submitWebsite()
     vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ answer: 'The service collects account details.', document_found: true, sources: [{ text: 'Account details', chunk_index: 2 }], source_attributions: [{ source_url: 'https://example.com/privacy', filename: '', policy_categories: ['privacy_policy'] }] }))
