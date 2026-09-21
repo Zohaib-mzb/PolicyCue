@@ -1,0 +1,680 @@
+{
+  "name": "PolicyCue Eval v1 — controlled policy QA benchmark",
+  "version": "1.0.0",
+  "synthetic": true,
+  "description": "Six fixed, authored synthetic policy documents with 50 reviewed QA labels. Controlled baseline for document-scoped policy retrieval, generation and abstention; not representative of all real-world policy documents. Evidence labels were assigned after inspecting production chunk_text output. Independent human review is recommended before public performance claims.",
+  "documents": [
+    {
+      "id": "ai",
+      "text": "Lumen Assist — controlled AI usage policy, revision 1\nFeature boundaries. Lumen provides optional drafting and summarisation tools inside a workspace. These tools suggest text for a user to review; they do not independently publish a document, submit an application or send a message to an outside recipient. Turning off the AI feature leaves ordinary manual editing available. An administrator can enable the feature for a workspace, but each member still decides whether to submit a particular prompt. A generated suggestion is not an instruction from the workspace administrator. Members should consider the task and the information being submitted before asking for a suggestion, rather than assume every document is suitable for AI processing.\n\nPrompt handling. When a member uses AI, the selected text and the prompt are sent to a contracted model provider to produce the requested response. Lumen does not use customer prompts or outputs to train its own general-purpose models, and its provider contract prohibits training the provider's general-purpose models on that submitted content. This restriction concerns model training, not the processing needed to generate a response. The member should submit only the text needed for the task. Ordinary workspace documents are not sent to the model provider simply because AI is enabled; a member must invoke the feature with selected material or a prompt.\n\nOperational retention. Prompt and output logs are retained for 30 days for abuse investigation and service troubleshooting, then deleted unless they are part of an active abuse investigation. An investigation hold lasts until that investigation is closed and is restricted to staff handling it. This logging schedule is distinct from the customer's decision to save a generated draft as a normal workspace document. Deleting a saved draft does not immediately erase an operational log still inside its retention period. Access to held logs is recorded, and the material may not be reused as a public demonstration. A training prohibition should not be interpreted as a promise that no operational records ever exist.\n\nSensitive inputs. Members must not submit passwords, authentication tokens, complete payment-card numbers or another person's medical records to the drafting tool. Replacing a person's name with initials does not make an otherwise identifiable medical record acceptable. Publicly available product specifications may be submitted when the member has permission to use them. An administrator enabling AI cannot waive these input restrictions. If a secret is submitted accidentally, the member should rotate the secret where appropriate and notify the security contact so access to the submitted material can be reviewed. Removing a saved response alone may not contain exposure of a credential that was already sent.\n\nReview of outputs. A member must check generated facts and any quoted sources before sharing an AI draft outside the workspace. AI text can contain errors, omit qualifications or describe a source inaccurately. The tool does not certify that a citation exists merely because it appears in a fluent answer. Editing a draft remains the member's responsibility, including checking that it does not reveal confidential information from selected source material. The interface offers a copy action for convenience, not a declaration that the output has passed review. A colleague's approval may be useful, but the policy does not replace the member's duty to check the relevant facts and sources.\n\nHigh-impact decisions. AI output must not be the sole basis for deciding whether a person receives employment, credit, housing or access to an essential service. A qualified human must assess the underlying evidence and be responsible for such a decision. Lumen may help organise non-sensitive background material for review, but the generated summary cannot substitute for that assessment. An administrator's instruction to use the tool does not remove the requirement for human responsibility. This restriction applies even if the output appears confident or gives a numerical ranking. It is intended to prevent an unreviewed generated suggestion from becoming the final decision about a person's opportunity.\n\nGenerated media disclosure. When a member shares an AI-generated image publicly as part of a campaign, the image or its accompanying caption must clearly disclose that it was AI-generated. A private internal draft that is not distributed publicly does not require this public disclosure label. Disclosure does not permit impersonating a real person or falsely presenting a fabricated event as a documented occurrence. A member who substantially edits a generated image must still disclose its AI origin when using it in the public campaign. The disclosure rule concerns the audience and use of the image, while factual review and permissions remain separate responsibilities.\n\nFeature incidents. Members can report unsafe or unexpectedly revealing AI output through the feedback control, including the minimum context needed to investigate. Reports should not reproduce a secret in an open team channel. An administrator may temporarily disable AI for the workspace while a report is investigated; manual editing and access to existing documents continue. Re-enabling the feature does not approve a previously unsafe prompt or remove restrictions on sensitive information. Support reviews incident reports to improve service handling, but a submitted report does not guarantee an immediate change to the underlying model. Users should stop relying on a suspect output while its accuracy or disclosure risk is unresolved.",
+      "chunk_sha256": [
+        "6e7f2acf90de5ac4756d3040f341d580b71f8eaaee516e484ced01c2805a35e5",
+        "044d4083e27fad0acd31efb3686d72d27f7f9b3657749b1b9da1f2402e6bb4e5",
+        "4569fee116a39581856076a6172df1f790d9644742cc0a9ca983b5bc8c56ea5e",
+        "9bae55cc495f533ffdab50be930744a539db790f67555da32897b92b65b682cf",
+        "69a04af4528822b2941d0306f15b91b530a9f8ba059b546ad76e7bc74f7c4898",
+        "19beae25ef383e85db0fbcfca23f415665b8c7d5cd0d2ac812c689764460b286",
+        "9d9a7f27a113bc034cf983e3fbe67bed8d7be9f7eea7a8786706110a3aa97ff4",
+        "b454007e57bd5977c4d71b206d698183bfe4f31f2fef56417176f931ab1e6e98"
+      ]
+    },
+    {
+      "id": "commerce",
+      "text": "Northstar Market — controlled commerce policy, revision 1\nRefund eligibility. Unused physical goods may be returned if they remain in their original packaging with all supplied accessories. Opening the outer delivery carton alone does not make a product used. Personalized goods and downloaded digital products are excluded from change-of-mind refunds, even if the buyer has not used them. A physical product with a manufacturing defect is assessed under the damaged-item process rather than the change-of-mind rules. Staff must not treat a bank dispute as an approved return. Customers should keep their receipt until the return is resolved. These eligibility rules describe which purchases can be returned; the request window is specified separately.\n\nRefund request window. A customer seeking a change-of-mind refund must submit the request within 30 calendar days after delivery, not after the order was placed. The request must include the order number and the item being returned. Customer support records the submission date when the completed form reaches the returns portal. Receiving an automated receipt does not establish eligibility. After approval, support supplies a return label and packing instructions. A parcel may arrive at the warehouse later without invalidating a request that was submitted on time. The customer remains responsible for protecting the contents in transit and keeping the parcel tracking receipt until the warehouse confirms arrival.\n\nRefund processing. Once the warehouse has inspected and accepted a returned item, the approved refund is sent to the original payment method within seven business days. The processing clock starts on acceptance after inspection, not on delivery to the customer or submission of the return request. Store credit is not substituted without the customer's agreement. Support sends a confirmation when the refund is issued; a payment provider may display the credit later. Original express-delivery fees are not refunded for a change-of-mind return. A rejected inspection is explained in writing, with photographs where useful, and the customer may ask support to review that decision before the item is sent back.\n\nExchanges. A size exchange for an unused garment may be requested within 21 calendar days after delivery, provided the desired size is in stock. The buyer must return the original garment with its tags attached. An exchange replaces the garment; it does not restart the original refund request window. If the requested size is unavailable, support can offer the normal refund process if that process's conditions are met. A colour preference is handled as a return and a new purchase, rather than a size exchange. Exchange postage within the domestic service area is covered once per order. Further exchanges require a fresh support assessment, and the policy does not promise stock availability during busy periods.\n\nDomestic delivery. Standard domestic shipping normally takes three to five business days after dispatch. Orders may spend up to two business days in preparation before dispatch, so a delivery estimate is not measured from checkout. Express shipping normally takes one to two business days after dispatch. Both services provide parcel tracking when the carrier receives the package. A delivery address correction should be requested before dispatch; after dispatch, the carrier decides whether rerouting is possible. Preparation and transit estimates are separate from refund or exchange deadlines. Weather disruption may extend the delivery estimate, and support will help trace a delayed parcel rather than silently cancel the order.\n\nInternational delivery. International orders are accepted only for destinations listed at checkout. Shipping charges are displayed before payment, and this policy does not offer free international shipping. Import duties and local customs charges are paid by the recipient. Standard international transit is normally eight to fifteen business days after dispatch, excluding time held by customs. A customer should check the recipient's contact details before placing an order because customs may require additional information. Refusing to pay a customs charge does not automatically create a refund entitlement. Where a parcel returns to the warehouse, support reviews its condition and the applicable return rules before proposing a resolution.\n\nSubscription cancellation. Monthly refill subscriptions can be cancelled in the account dashboard. To prevent the next renewal charge, cancellation must be completed at least 48 hours before the scheduled renewal time. Cancelling stops future renewals but does not automatically refund a refill order that has already been charged. A charged physical refill is assessed under the same return eligibility and request rules as other physical goods. Pausing a subscription skips one renewal and leaves later renewals active; it is different from cancellation. Support can help locate the dashboard but cannot guarantee that a message sent near the cutoff will be processed before renewal. A confirmation email records the cancellation time.\n\nDamaged or defective arrivals. Customers should report an item that arrived damaged or with a manufacturing defect within 14 calendar days after delivery, attaching the order number and clear photographs of the item and packaging. Support first reviews whether replacement parts or a replacement item can resolve the problem. Where a return is necessary, Northstar supplies prepaid postage for the defective item. The unused-item restriction for change-of-mind returns does not prevent a defect claim after reasonable inspection. Damage caused by customer misuse is not covered by this process. A claim is assessed against the reported defect; a scratch to the delivery carton without damage to the goods is not itself a product defect.",
+      "chunk_sha256": [
+        "15f5ce1fbb9511955c47b1165626069776103edbfd7b24e97f60957e5ccfda2f",
+        "d4d9901cc967385b6fb7202c86d05edd67c8b9ce443d6b2f291f7083d83e92bb",
+        "952dacec22ba27e7a5cf580b0140735cda0c74d94dd7237833a1df6bf6dfb36e",
+        "48fc0483a255ccb1639bb6f0d3ebba91609550a71698200141a3e17c519141c9",
+        "a18f4d7000c847b7af01dd62cc62a9af1cea7610ef6141147948d412b02cbb4c",
+        "7b3f937547089ccaf996f34130fb3fc657309269f386a268a72a83433faa1778",
+        "7b77adb6b9be0aa198d63abd5df44d2f924dce57259356b920b5e2863a6e5f3f",
+        "61db23ae492ec7a9c79591d1eb425207f15830e537600a8b3e2da669ed7c1f3f"
+      ]
+    },
+    {
+      "id": "community",
+      "text": "Meadow Forum — controlled community guidelines, revision 1\nCriticism and harassment. Members may criticise ideas, products and public decisions, including strongly worded disagreement, as long as they do not direct threats or sustained personal abuse at another person. Repeatedly tagging someone after they have asked for contact to stop is treated as targeted harassment. Disagreement with a moderator's decision is not itself harassment and may be raised through the appeal process. Members should quote only the material needed to explain a criticism rather than repost a private conversation in full. Moderators consider the surrounding discussion when deciding whether language attacks an idea or targets a person. Popularity of a post does not excuse prohibited conduct.\n\nPrivate information. Posting another person's home address, private phone number or identity-document number without their consent is prohibited, even if the information was obtained from a different website. Removing one digit does not make an otherwise identifiable private phone number acceptable. Members can discuss public business contact information when relevant to the discussion, but should not use it to organise harassment. If private information is posted accidentally, the author should remove it promptly and report the incident so moderators can review copies. A member's willingness to share one contact detail does not imply consent to publish their other private information.\n\nPromotional posts. Members may share their own project in the weekly showcase thread, with a clear statement of their connection to the project. The same promotional message may not be copied into unrelated discussion threads. Affiliate links must be marked as affiliate links before a reader follows them. Ordinary recommendations made without payment or affiliation do not require a promotional label, though they still must fit the discussion. Moderators may move an otherwise acceptable project announcement into the showcase thread. Disclosure makes a permitted promotion transparent; it does not authorise spam, impersonation or misleading claims about a product's capabilities.\n\nGraphic content. Realistic graphic injury images are not allowed in public posts or profile pictures. A text discussion of an accident or safety incident is allowed if it avoids gratuitous descriptions and does not identify a private victim without consent. Educational intent does not override the ban on graphic injury images in public areas. Members reporting such an image should use the report control rather than quote or reupload it into a complaint thread. Moderators may preserve a restricted internal copy to review the report. A simple safety diagram without realistic injury detail is not treated as a graphic injury image under this rule.\n\nReporting and review. The report control sends a post and its surrounding discussion to the moderation queue. Reports should identify the suspected rule violation and relevant context, rather than recruit other members to submit duplicate reports. Moderators assess the content, not merely the number of reports received. A report acknowledgement confirms receipt and does not mean the reported member has been found at fault. Members facing an immediate real-world emergency should contact appropriate local emergency services instead of waiting for forum moderation. The forum does not guarantee a fixed response time for ordinary reports; urgency and available evidence influence the review order.\n\nEnforcement ladder. For an ordinary first violation, moderators normally remove the offending content and send a warning explaining the rule. A second ordinary violation within 90 days results in a seven-day posting restriction. A credible threat of violence can instead result in an immediate permanent ban, without a prior warning. Restrictions are tied to the account's conduct, not the popularity of the member. Trying to evade a restriction with another account is a separate violation. Moderators record which rule was applied so the affected member can understand the decision. The ordinary ladder does not limit action needed to protect a person from a credible threat.\n\nAppeals. An affected member may appeal a moderation decision within 14 calendar days of the decision notice. The appeal should identify the decision and explain the relevant context or claimed error. A moderator who did not make the original decision reviews the appeal. The existing restriction remains in force while the appeal is considered unless the review team explicitly lifts it. Repeatedly reposting removed content is not an appeal and may create another violation. A successful appeal may restore content or shorten a restriction, depending on the finding. Members receive the outcome through the account inbox rather than through a public vote in the discussion thread.\n\nAutomated participation. Bots may post only in channels whose moderators have explicitly approved that bot, and every automated post must be visibly labelled as automated. Approval for one channel does not authorise posting across the entire forum. A human operator remains responsible for the bot's conduct and must provide a working contact route to moderators. Bots must not impersonate ordinary members or send unsolicited private promotional messages. Moderators can revoke channel approval when a bot becomes disruptive even if its posts are labelled. Technical availability of an account token does not count as permission to operate a bot, and a labelled post must still follow all content rules.",
+      "chunk_sha256": [
+        "67933b39af535cbc17412b5027a3a939ce0dda6fe88a810386c85f73e879978a",
+        "dc37c8b1e997ce9474e8f8762aab5336d71afa870604bd7ff0d0ba207c152abb",
+        "947ab2e1247269959a9c0f60f8dd7144a95d6d3b44021dcd469be3ffc06e2d48",
+        "9bae956e36272933f73ced0b4863f5c80132f34ad7b8fa035c52058c12ac9511",
+        "b45dab0bdee02389b7c405ec1dfdbd77eaabaad9a10a29067fa486730c266834",
+        "fe7aec2466cd85a04143937ee053009117f1083557172a8c5bbef87ea54fafb8",
+        "70c7ed8ca91c472209245fec10f0e5c6fd6addfa554fe47a7ac36c3280a2a078",
+        "5328285a1ca28816e5525fae9f34000c6b40a21497c203a46f0594e8497b52c2"
+      ]
+    },
+    {
+      "id": "cookies",
+      "text": "Cedar Library — controlled cookie and tracking policy, revision 1\nEssential session cookies. Cedar uses a session cookie to keep a signed-in reader authenticated while moving between library pages. The cookie expires when the browser session ends and is not used for advertising. A reader who blocks this cookie can browse public catalogue pages but cannot remain signed in to the private reading shelf. Essential cookies operate without optional-cookie consent because they support the requested sign-in function. The session cookie does not contain the text of a reader's saved notes. Signing out invalidates the server-side session even if a browser retains a stale local copy of the cookie until its next cleanup.\n\nSecurity cookies. A separate security cookie helps distinguish ordinary requests from repeated automated abuse of the sign-in form. It expires after 24 hours and is classified as essential. The security cookie is not used to choose advertisements or to build a reading-interest profile. Clearing it may require the browser to complete an additional sign-in check, but does not delete the reader's account or saved shelf. Security controls should not be confused with optional traffic measurement: declining analytics does not disable the checks protecting sign-in. Cedar reviews security-cookie use when changing authentication flows so it remains limited to the protection of the service.\n\nAnalytics cookies. Optional analytics cookies measure which catalogue pages readers visit and how often navigation errors occur. They expire after 90 days unless the reader removes them earlier. Analytics cookies are set only after the reader gives analytics consent in the preference panel. Declining consent does not prevent access to public catalogue pages or an existing reading shelf. Analytics measurements are used to improve navigation, not to select advertisements for a particular reader. A cookie's expiry is the browser-side lifetime of that identifier; aggregate reporting has a separate retention rule. A member of staff testing navigation must respect the same consent setting as any other reader.\n\nAggregate measurement. Once optional analytics events have been stripped of browser identifiers and combined into aggregate counts, Cedar retains those aggregate reports for 13 months. The reports show totals such as visits to a catalogue category and do not allow staff to recover an individual reader's browsing path. The 13-month period applies to aggregate reports rather than the analytics cookie stored in a browser. Removing a cookie cannot remove a person's contribution from a report that no longer identifies them. Cedar uses these reports to compare seasonal navigation patterns and decide which parts of the catalogue need clearer signposting, without publishing individual reading histories.\n\nPreference controls. Readers can change optional-cookie choices at any time through the Cookie Preferences link in the page footer. Withdrawal stops new optional analytics collection on that browser and causes Cedar to remove its optional analytics cookie there. The setting is browser-specific, so changing it on a laptop does not automatically change another browser on a phone. Existing aggregate reports are not deleted when consent is withdrawn because they no longer identify a reader. The preference cookie stores the chosen consent state for six months and is essential to remembering that choice. A reader can reopen the panel without creating an account or contacting support.\n\nEmbedded media. Some catalogue articles include a third-party video preview. The video provider's player loads only after a reader activates that preview and accepts the accompanying media consent prompt. If the reader declines, the article text and a plain link to the provider remain available. Cedar does not activate the player merely because the article was opened or because analytics consent was given. The video provider may then use its own cookies under its own policy, which the consent prompt links to. Accepting one video preview does not change the separate analytics preference stored for Cedar's catalogue pages.\n\nAdvertising and sharing. Cedar does not set advertising cookies and does not sell browsing-interest profiles to advertising networks. Optional analytics consent therefore does not opt a reader into personalised advertising. External sites linked from the catalogue may have their own advertising practices once a reader chooses to visit them. Cedar's policy describes tracking on its own catalogue and embedded-media controls, not a guarantee about every external destination. Library sponsors receive aggregate campaign counts, not a list of named readers or their saved shelves. Sponsorship of a reading list does not grant the sponsor access to account authentication cookies or private notes.\n\nBrowser maintenance. Most browsers allow a reader to remove stored cookies and control future cookie storage. Removing all cookies may sign the reader out and erase the remembered consent choice on that browser, so the preference panel may appear again. It does not delete the server-side account or saved reading shelf. The next visit can set essential cookies needed for a requested feature, while optional analytics still waits for consent. A private browsing window maintains a separate local cookie state from an ordinary window. Browser settings vary, so Cedar links to browser help rather than promise that every browser presents identical controls or menu names.",
+      "chunk_sha256": [
+        "10b173ed39ee07a5ac10d755da67cf1624db44fa9d57d29ce483c0d452ec4847",
+        "2955441cfacf8297d102b7331957672e3ee25d0540e70d9fe81c37a2125b2269",
+        "76b78c65471d0670a2c71a2dd4961d12ddadeeb48ce07f0d62111c667be88c92",
+        "ce435003d5aa21f31668db9b6880eab5bdb1e39e1cf0b7d562825c7dceb287ef",
+        "7369d94e7a8dea8104a0890001c5bead44187cffd432eb171b00dd99f72591f7",
+        "9a302ce26638f458c1ea3dbbe4b2711450ecf588c8b1e7818ec85832d43abcee",
+        "a3b300859b0af6ab43970451faf51faed2d8dba4737f78296757129b9ef2019e",
+        "90bdf2db8157d78ec539725c5fca476d33c5b1c0763474076e505408ba54e3e7"
+      ]
+    },
+    {
+      "id": "privacy",
+      "text": "Harbor Workspace — controlled privacy policy, revision 1\nAccount information. Harbor collects an account email address, display name and workspace membership details to operate shared workspaces. The email address is used for security notices and service communications, while a display name appears beside a member's contributions. The account form does not require a home address. Optional profile photographs can be removed without closing the account. Workspace administrators can see members' display names and membership roles but cannot see another member's private support tickets. Account records are distinct from diagnostic events generated during use of the service. Providing an optional profile field does not automatically enroll a member in marketing messages.\n\nDiagnostic information. The service records device type, browser version, time of access and error codes to diagnose reliability problems. Raw diagnostic events are retained for 30 days and then deleted or converted into aggregate statistics that cannot identify an account. The service does not use the content of private documents in diagnostic event messages. Error reports submitted voluntarily may include an attachment, which the member should review before sending. Troubleshooting access is limited to staff working on the reported incident and is recorded for audit. A short-term diagnostic event should not be confused with the separately retained support conversation about the incident or with a financial transaction record.\n\nSupport ticket retention. Support tickets, including attachments sent with the ticket, are retained for 180 days after the ticket is closed. Closing a ticket means support has marked the conversation resolved; the retention clock does not begin when the first message is sent. If a member reopens a closed ticket before deletion, the period is measured from its later closure. Members should avoid placing passwords or payment-card numbers in a ticket. Support staff may remove accidentally submitted secrets earlier than the scheduled deletion date. Ticket content is used to resolve requests and review service quality, not to create public case studies identifying the member without separate permission.\n\nBilling records. Invoices and transaction identifiers are retained for six years after the end of the financial year in which the transaction occurred. This retention rule applies even when a member closes an account or requests deletion. Harbor stores payment status and the last four digits supplied by its payment processor; the processor handles full card details. Billing records are used for accounting, disputes and required financial records, rather than personalised advertising. A workspace administrator may download invoices from the billing console while the workspace remains active. Removing an optional profile photograph has no effect on the retention schedule for invoices or transaction identifiers.\n\nAccount deletion. A member can request account deletion through the privacy form after verifying control of the account email address. Harbor removes the active account profile within 30 days of a verified request. Records subject to the billing-retention rule are kept separately and are not erased by this profile-deletion process. Deletion of an account is not the same as removing a person from one workspace, because a person may belong to several workspaces. The confirmation identifies when profile deletion is completed. Members who need a copy of their contributions should request an export before deletion, since the privacy team cannot restore an erased active profile merely to satisfy a later export request.\n\nService providers. Harbor shares information with contracted hosting, customer-support and payment service providers only as needed to deliver those functions. Providers are instructed to process that information on Harbor's behalf and may not use it for their own advertising. Harbor does not sell account email addresses. Access to a support attachment is limited to the staff and providers needed to investigate that request. A workspace administrator inviting a member is not treated as a purchase of that member's personal data. This section explains categories of recipients and restrictions on their use of information; it does not identify the physical country in which hosting infrastructure is located.\n\nMarketing choices. Product-news emails are sent only when a member has opted in. A member may withdraw that choice through the unsubscribe link, and Harbor applies the change within two business days. Unsubscribing from product news does not stop security alerts, password-reset messages or notices needed to operate an existing account. Marketing preference changes are not account-deletion requests. Staff must check the recorded preference before sending a new campaign rather than assume that membership in a paid workspace implies consent. A request to correct an email address should be made through the account settings so future service notices reach the verified address.\n\nAccess and correction. After verifying account control, Harbor responds to an export request within 20 business days and provides account profile data and the member's own contributions in a downloadable archive. The export does not include other members' private support tickets or internal security investigation notes. Members may correct their display name directly in settings; changing the account email requires verification of the new address. An export request alone does not close an account or remove workspace access. If verification cannot be completed, the privacy team asks for additional account information rather than send the archive to an unverified destination. These procedures protect against someone impersonating another member.",
+      "chunk_sha256": [
+        "ec34c085f9cf9944bfc81de1267e7d6990ca2fee77a2a0f7b3d33b356c77b405",
+        "b9f0e4578bd7a96cc63f7a6cb4c4cf6740f9a7827de7788faacd535afd771acf",
+        "0864e593a3d7ca324214d5861bed8ee1c78d1c0129ffb58c121c6f580fe516d4",
+        "d30c4eb9b91a9bbd5a3b6ee32bb438dc0bee905b817299b598aa3b8419a084a8",
+        "ab5b9b2c507c9d971c9782cf469f85c8a6d95390ba20b3e09f42bbd88207209a",
+        "ddb09662b91500df62c3170c80d0217a40e8ed0cce30ff30800f67b5c92e0f75",
+        "14f7fbee06a33dec3dd526e502834f19e9d7b10fa422e6252dbafb291aab6973",
+        "802017fcbb11c8828fa6816448491af80958d6e4a01e084155fe0dd8afcbec7c"
+      ]
+    },
+    {
+      "id": "terms",
+      "text": "Atlas Studio — controlled service terms, revision 1\nWho may register. Individual users must be at least 18 years old to create an Atlas Studio account. A person creating an account for an organisation must also have authority to accept the service terms for that organisation. The age rule applies to individual accounts regardless of whether a free trial or paid plan is selected. Keeping login credentials private is the account holder's responsibility. Shared team work should use separate member accounts instead of a common password. An account invitation from an administrator does not waive the minimum age requirement. Contact details must remain accurate so security and billing notices can reach the responsible account holder.\n\nTrial period. A new workspace may use a 14-day trial without supplying a payment card. The trial starts when the workspace is created and ends at the same time of day 14 calendar days later. At expiry, editing is disabled until the owner chooses a paid plan. A trial does not convert automatically into a paid subscription, and the service does not charge a card merely because the owner viewed the pricing page. Trial work can still be exported during the following seven days. Support may explain plan differences but cannot extend a trial by treating a renamed workspace as a new customer. These trial rules are separate from renewal arrangements for an already paid workspace.\n\nPaid-plan renewal. Monthly paid plans renew on the same calendar day each month, with the final day of the month used if that day does not exist. The workspace owner can disable renewal in billing settings before the renewal time. Cancellation takes effect at the end of the paid period; members retain their plan features until then. Monthly fees already paid are not refunded solely because the owner stopped using the service mid-month. Cancelling renewal does not delete workspace content. The owner receives an email confirmation and should keep it if a billing dispute later arises. An administrator without billing permissions must ask the owner to change the renewal setting.\n\nAnnual plan changes. An owner on an annual plan may request a downgrade at any time, but the lower plan begins only when the current annual term ends. A downgrade does not create a prorated refund for unused months. Extra seats added during an annual term are charged for the remaining part of that term and join the same renewal date. Removing a seat prevents its renewal but does not erase content authored by that member. Support records the requested plan so the owner can check the change before the next invoice. Annual billing rules do not turn an unpaid trial into an annual commitment; the owner must explicitly choose and purchase the annual plan.\n\nCustomer content licence. Customers retain ownership of the documents and designs they upload. They grant Atlas a limited licence to store, process and display that content solely to provide the service and carry out the customer's sharing instructions. The licence does not permit Atlas to sell a customer's private designs as stock assets. Publishing a share link allows access to the selected material under the link's settings; it does not transfer ownership to a viewer. Customers must hold the rights needed for uploaded content. If a customer removes a public share link, Atlas stops offering access through that link, although a recipient may already have downloaded a permitted copy.\n\nSuspension process. Atlas may suspend access immediately when necessary to contain an active security incident, such as a compromised account distributing malicious links. For an ordinary first-time billing failure, Atlas instead sends a notice and allows seven calendar days to update payment details before suspension. A suspended workspace cannot edit or create share links, but its owner can contact support to resolve the stated cause. These two situations use different response times because a live security incident can harm other users while a failed payment normally does not. An owner should not interpret a payment grace period as permission to continue activity that threatens the service.\n\nEnding an account. An owner who chooses permanent workspace closure has 30 calendar days after closure to request a content export. After that window, the active workspace content is scheduled for deletion and Atlas no longer promises an export. Closure affects the entire workspace, whereas cancelling paid-plan renewal only changes future billing. The closing owner is responsible for notifying other members and keeping any required copies. Content under an active dispute hold may be retained separately until that dispute is resolved. Requesting an export does not reactivate a closed workspace or start a new paid term. Support verifies the owner's identity before releasing a closure archive.\n\nService availability. Maintenance notices are posted on the status page when planned work is expected to interrupt access. Atlas aims to reduce disruption, but these terms do not promise uninterrupted operation or a fixed uptime percentage. Customers should keep copies of critical work and avoid relying on an unsaved browser tab as their only record. A status incident explains the scope of an outage and may be updated as the investigation proceeds. Reporting an outage does not itself create a refund, service credit or extension of a paid term. The support team prioritises restoring access and then publishes relevant incident information when it is available.",
+      "chunk_sha256": [
+        "d02fc1d96d07dd440e49eb2d82174e9d6f0d491236ccf30107387c949ac00f07",
+        "05a0dbbdd54736dfd06d0da66c24f20b681b6f59932ab62105a78a49fce9cc89",
+        "53b1f54f55c98de40cb2cd8aefd3f995b01a18cc1bb81e1a225d3a444087d453",
+        "26829da143c8c7ec34cac99f51bb6274193c933e9df4cf289c7d0c5703759ce4",
+        "0b3921d2f21555a6f11defb912053f254c21589c1790f39dc1544dc9b9bd13c1",
+        "0717f7ed37fc1260d6f9aef7d10d35daccfc25def0015ed18226a7a9997ee160",
+        "cef9d498425fec94a48f7ac081d0b88d4d4ea6d508bd09342d3eea995bc5fe2a",
+        "d455ebcbd9a5b888d8d3d0d8f4574a7afbaafbbc0dea98326ff1f1cb8072b762"
+      ]
+    }
+  ],
+  "examples": [
+    {
+      "id": "commerce-01",
+      "document_id": "commerce",
+      "category": "direct_fact",
+      "question": "What is the deadline for submitting a change-of-mind refund request, and when does the clock start?",
+      "expected_answer": "Submit it within 30 calendar days after delivery, not after placing the order.",
+      "relevant_chunk_ids": [
+        "commerce:1"
+      ],
+      "should_answer": true,
+      "notes": "Evidence: Refund request window; distinguish delivery from purchase and warehouse receipt."
+    },
+    {
+      "id": "commerce-02",
+      "document_id": "commerce",
+      "category": "qualifier_sensitive",
+      "question": "Can every unused purchase be returned for a change-of-mind refund, including a personalised item and a downloaded product?",
+      "expected_answer": "No. Unused physical goods must be in original packaging with all supplied accessories; personalised goods and downloaded digital products are excluded even if unused.",
+      "relevant_chunk_ids": [
+        "commerce:0"
+      ],
+      "should_answer": true,
+      "notes": "Evidence: Refund eligibility. Unused is necessary for ordinary physical goods, not sufficient for every purchase."
+    },
+    {
+      "id": "commerce-03",
+      "document_id": "commerce",
+      "category": "semantic_confusion",
+      "question": "Are the time limit to ask for a refund and the time to receive an approved refund measured from the same event?",
+      "expected_answer": "No. The request is due within 30 calendar days after delivery; an approved refund is sent within seven business days after warehouse inspection and acceptance.",
+      "relevant_chunk_ids": [
+        "commerce:1",
+        "commerce:2"
+      ],
+      "should_answer": true,
+      "notes": "Both chunks required: request deadline and processing clock are different periods with different start events."
+    },
+    {
+      "id": "commerce-04",
+      "document_id": "commerce",
+      "category": "paraphrased",
+      "question": "For a standard domestic order, should I count the advertised three-to-five-day journey from checkout?",
+      "expected_answer": "No. The three to five business days run from dispatch; preparation can take up to two business days before dispatch.",
+      "relevant_chunk_ids": [
+        "commerce:4"
+      ],
+      "should_answer": true,
+      "notes": "Evidence: Domestic delivery, including the preparation/transit distinction."
+    },
+    {
+      "id": "commerce-05",
+      "document_id": "commerce",
+      "category": "negative_exception",
+      "question": "Does an overseas buyer get free shipping and have the seller pay import duties?",
+      "expected_answer": "No. International shipping charges are shown before payment, and the recipient pays import duties and local customs charges.",
+      "relevant_chunk_ids": [
+        "commerce:5"
+      ],
+      "should_answer": true,
+      "notes": "Evidence explicitly rejects free international shipping and assigns customs charges to the recipient."
+    },
+    {
+      "id": "commerce-06",
+      "document_id": "commerce",
+      "category": "multi_sentence",
+      "question": "My order arrived defective. What must I provide, by when, and who pays postage if it has to go back?",
+      "expected_answer": "Report it within 14 calendar days after delivery with the order number and clear photos of the item and packaging. Northstar supplies prepaid return postage if a return is necessary.",
+      "relevant_chunk_ids": [
+        "commerce:7"
+      ],
+      "should_answer": true,
+      "notes": "All requested defect-claim facts are in Damaged or defective arrivals; do not substitute the change-of-mind deadline."
+    },
+    {
+      "id": "commerce-07",
+      "document_id": "commerce",
+      "category": "multi_chunk",
+      "question": "I cancelled a refill subscription after its latest physical refill was charged. Is that order refunded automatically, and what change-of-mind conditions and request deadline apply?",
+      "expected_answer": "Cancellation does not automatically refund an already charged refill. It follows the physical-goods return rules: it must be unused, in original packaging with all supplied accessories, and requested within 30 calendar days after delivery.",
+      "relevant_chunk_ids": [
+        "commerce:0",
+        "commerce:1",
+        "commerce:6"
+      ],
+      "should_answer": true,
+      "notes": "Three required sections: cancellation routes a charged refill to normal rules; eligibility and the request window supply the actual conditions."
+    },
+    {
+      "id": "commerce-08",
+      "document_id": "commerce",
+      "category": "multi_chunk",
+      "question": "What are the request windows for a size exchange and a change-of-mind refund, and does exchanging restart the refund clock?",
+      "expected_answer": "A size exchange may be requested within 21 calendar days after delivery, and a change-of-mind refund within 30 calendar days after delivery. An exchange does not restart the original refund window.",
+      "relevant_chunk_ids": [
+        "commerce:1",
+        "commerce:3"
+      ],
+      "should_answer": true,
+      "notes": "Exchange terms supply 21 days and no reset; the refund request section supplies 30 days."
+    },
+    {
+      "id": "commerce-09",
+      "document_id": "commerce",
+      "category": "unanswerable",
+      "question": "Which cryptocurrencies can I use to pay for an order?",
+      "expected_answer": null,
+      "relevant_chunk_ids": [],
+      "should_answer": false,
+      "notes": "Whole document reviewed: payment method is mentioned for refunds, but accepted currencies or cryptocurrencies are not specified."
+    },
+    {
+      "id": "commerce-10",
+      "document_id": "commerce",
+      "category": "unanswerable",
+      "question": "What special refund deadline applies to members of the premium loyalty programme?",
+      "expected_answer": null,
+      "relevant_chunk_ids": [],
+      "should_answer": false,
+      "notes": "Whole document reviewed: no loyalty programme or member-specific refund deadline is described. Do not substitute the ordinary deadline."
+    },
+    {
+      "id": "privacy-01",
+      "document_id": "privacy",
+      "category": "direct_fact",
+      "question": "How long is a support ticket kept, and which closure date matters if it is reopened?",
+      "expected_answer": "It is kept for 180 days after closure; if reopened before deletion, the period starts from its later closure.",
+      "relevant_chunk_ids": [
+        "privacy:2"
+      ],
+      "should_answer": true,
+      "notes": "Evidence: Support ticket retention, including the reopening rule."
+    },
+    {
+      "id": "privacy-02",
+      "document_id": "privacy",
+      "category": "paraphrased",
+      "question": "If I stop receiving product announcements, will I also stop getting password-reset and security messages?",
+      "expected_answer": "No. Unsubscribing stops product-news emails, with the change applied within two business days, but security alerts, password resets and necessary service notices continue.",
+      "relevant_chunk_ids": [
+        "privacy:6"
+      ],
+      "should_answer": true,
+      "notes": "Marketing choices separates optional news from operational notices."
+    },
+    {
+      "id": "privacy-03",
+      "document_id": "privacy",
+      "category": "multi_chunk",
+      "question": "After a verified deletion request, when is my active profile removed, and how long can invoice records still be retained?",
+      "expected_answer": "The active profile is removed within 30 days of the verified request. Invoices and transaction identifiers remain for six years after the end of the financial year of the transaction, even if the account is closed.",
+      "relevant_chunk_ids": [
+        "privacy:3",
+        "privacy:4"
+      ],
+      "should_answer": true,
+      "notes": "Deletion gives the profile deadline; Billing records gives the separate duration and financial-year start point."
+    },
+    {
+      "id": "privacy-04",
+      "document_id": "privacy",
+      "category": "qualifier_sensitive",
+      "question": "Can hosting or payment contractors use information received from Harbor for their own advertising?",
+      "expected_answer": "No. Contracted service providers may process it only as needed for their functions on Harbor's behalf and may not use it for their own advertising.",
+      "relevant_chunk_ids": [
+        "privacy:5"
+      ],
+      "should_answer": true,
+      "notes": "Evidence: Service providers. Sharing for service delivery is not permission for independent advertising."
+    },
+    {
+      "id": "privacy-05",
+      "document_id": "privacy",
+      "category": "semantic_confusion",
+      "question": "Are raw diagnostic events and a closed support conversation about the same error kept for the same length of time?",
+      "expected_answer": "No. Raw diagnostic events are retained for 30 days before deletion or conversion to non-identifying aggregates. A support ticket, including attachments, is retained for 180 days after closure.",
+      "relevant_chunk_ids": [
+        "privacy:1",
+        "privacy:2"
+      ],
+      "should_answer": true,
+      "notes": "Both distinct retention schedules are required; related incident content does not merge their clocks."
+    },
+    {
+      "id": "privacy-06",
+      "document_id": "privacy",
+      "category": "multi_sentence",
+      "question": "What can I receive in an account export, how long does it take after verification, and does requesting one close my account?",
+      "expected_answer": "Harbor responds within 20 business days with profile data and the member's own contributions. Other members' private support tickets and internal security notes are excluded. Requesting an export alone does not close the account.",
+      "relevant_chunk_ids": [
+        "privacy:7"
+      ],
+      "should_answer": true,
+      "notes": "Evidence: Access and correction; distinguish responding with an archive from deleting an account."
+    },
+    {
+      "id": "privacy-07",
+      "document_id": "privacy",
+      "category": "unanswerable",
+      "question": "In which country are Harbor's hosting servers physically located?",
+      "expected_answer": null,
+      "relevant_chunk_ids": [],
+      "should_answer": false,
+      "notes": "Whole document reviewed: provider categories are described, but the hosting country is expressly unspecified."
+    },
+    {
+      "id": "privacy-08",
+      "document_id": "privacy",
+      "category": "unanswerable",
+      "question": "How long are deleted account profiles kept in disaster-recovery backups?",
+      "expected_answer": null,
+      "relevant_chunk_ids": [],
+      "should_answer": false,
+      "notes": "Whole document reviewed: active-profile removal and other record schedules do not specify a backup retention period."
+    },
+    {
+      "id": "terms-01",
+      "document_id": "terms",
+      "category": "direct_fact",
+      "question": "How old must an individual be to open an Atlas Studio account?",
+      "expected_answer": "At least 18 years old, including for a free-trial account.",
+      "relevant_chunk_ids": [
+        "terms:0"
+      ],
+      "should_answer": true,
+      "notes": "Evidence: Who may register; the same age requirement applies to trials."
+    },
+    {
+      "id": "terms-02",
+      "document_id": "terms",
+      "category": "paraphrased",
+      "question": "Will trying a workspace for two weeks create a paid subscription unless I cancel?",
+      "expected_answer": "No. The 14-day trial needs no payment card and does not automatically become paid. Editing is disabled at expiry until the owner chooses a paid plan.",
+      "relevant_chunk_ids": [
+        "terms:1"
+      ],
+      "should_answer": true,
+      "notes": "Evidence: Trial period explicitly rejects automatic conversion."
+    },
+    {
+      "id": "terms-03",
+      "document_id": "terms",
+      "category": "negative_exception",
+      "question": "Can an annual-plan owner downgrade now and get unused months refunded immediately?",
+      "expected_answer": "No. A downgrade can be requested at any time but takes effect only at the end of the annual term, without a prorated refund for unused months.",
+      "relevant_chunk_ids": [
+        "terms:3"
+      ],
+      "should_answer": true,
+      "notes": "Evidence: Annual plan changes; request timing differs from the effective date."
+    },
+    {
+      "id": "terms-04",
+      "document_id": "terms",
+      "category": "multi_chunk",
+      "question": "How does cancelling monthly renewal differ from permanently closing the workspace in terms of access and exporting content?",
+      "expected_answer": "Cancelling monthly renewal preserves plan features until the paid period ends and does not delete workspace content. Permanent closure gives the owner 30 calendar days after closure to request an export; afterwards active content is scheduled for deletion and an export is no longer promised.",
+      "relevant_chunk_ids": [
+        "terms:2",
+        "terms:6"
+      ],
+      "should_answer": true,
+      "notes": "Both Paid-plan renewal and Ending an account are needed; cancellation and closure are different actions."
+    },
+    {
+      "id": "terms-05",
+      "document_id": "terms",
+      "category": "qualifier_sensitive",
+      "question": "Does Atlas have to allow seven days before suspending an account that is actively distributing malicious links?",
+      "expected_answer": "No. An active security incident can trigger immediate suspension; the seven-calendar-day notice period applies to an ordinary first-time billing failure.",
+      "relevant_chunk_ids": [
+        "terms:5"
+      ],
+      "should_answer": true,
+      "notes": "Evidence: Suspension process; do not generalise payment grace to a live security incident."
+    },
+    {
+      "id": "terms-06",
+      "document_id": "terms",
+      "category": "multi_sentence",
+      "question": "When I upload a private design, who owns it, what may Atlas do with it, and may Atlas sell it as a stock asset?",
+      "expected_answer": "The customer retains ownership. Atlas has a limited licence to store, process and display it to provide the service and follow the customer's sharing instructions, not to sell private designs as stock assets.",
+      "relevant_chunk_ids": [
+        "terms:4"
+      ],
+      "should_answer": true,
+      "notes": "Evidence: Customer content licence separates ownership, operational licence and prohibited resale."
+    },
+    {
+      "id": "terms-07",
+      "document_id": "terms",
+      "category": "unanswerable",
+      "question": "Which country's law governs disputes under these service terms?",
+      "expected_answer": null,
+      "relevant_chunk_ids": [],
+      "should_answer": false,
+      "notes": "Whole document reviewed: no governing-law jurisdiction is specified."
+    },
+    {
+      "id": "terms-08",
+      "document_id": "terms",
+      "category": "unanswerable",
+      "question": "What is the monetary cap on Atlas's liability for loss of customer data?",
+      "expected_answer": null,
+      "relevant_chunk_ids": [],
+      "should_answer": false,
+      "notes": "Whole document reviewed: availability cautions and backup advice do not specify a monetary liability cap."
+    },
+    {
+      "id": "community-01",
+      "document_id": "community",
+      "category": "direct_fact",
+      "question": "How long does a member have to appeal a moderation decision, and who reviews it?",
+      "expected_answer": "Within 14 calendar days of the decision notice; a moderator who did not make the original decision reviews the appeal.",
+      "relevant_chunk_ids": [
+        "community:6"
+      ],
+      "should_answer": true,
+      "notes": "Evidence: Appeals. The review must not be assigned to the original decision-maker."
+    },
+    {
+      "id": "community-02",
+      "document_id": "community",
+      "category": "paraphrased",
+      "question": "Can I publicly disagree strongly with a moderator without that disagreement automatically counting as harassment?",
+      "expected_answer": "Yes. Disagreement with a moderation decision is not itself harassment; criticism is allowed without threats or sustained personal abuse, and the appeal process is available.",
+      "relevant_chunk_ids": [
+        "community:0"
+      ],
+      "should_answer": true,
+      "notes": "Evidence: Criticism and harassment contains the full distinction; appeal deadlines are not asked for."
+    },
+    {
+      "id": "community-03",
+      "document_id": "community",
+      "category": "qualifier_sensitive",
+      "question": "If a bot visibly labels its posts as automated, may it post in any forum channel?",
+      "expected_answer": "No. Each channel's moderators must explicitly approve that bot; a label and approval in one channel do not authorise all channels.",
+      "relevant_chunk_ids": [
+        "community:7"
+      ],
+      "should_answer": true,
+      "notes": "Evidence: Automated participation requires both per-channel approval and visible labels."
+    },
+    {
+      "id": "community-04",
+      "document_id": "community",
+      "category": "negative_exception",
+      "question": "Can someone publish realistic graphic injury photos in a public post if the purpose is educational?",
+      "expected_answer": "No. Educational intent does not override the ban on realistic graphic injury images in public posts or profile pictures.",
+      "relevant_chunk_ids": [
+        "community:3"
+      ],
+      "should_answer": true,
+      "notes": "Evidence: Graphic content; permitted text discussion is not permission for realistic injury images."
+    },
+    {
+      "id": "community-05",
+      "document_id": "community",
+      "category": "multi_chunk",
+      "question": "For a second ordinary violation within 90 days, what restriction normally applies, and does an appeal automatically pause it?",
+      "expected_answer": "A seven-day posting restriction normally applies. An appeal does not automatically pause it; the restriction remains unless the review team explicitly lifts it.",
+      "relevant_chunk_ids": [
+        "community:5",
+        "community:6"
+      ],
+      "should_answer": true,
+      "notes": "Enforcement ladder supplies the sanction; Appeals supplies its status during review."
+    },
+    {
+      "id": "community-06",
+      "document_id": "community",
+      "category": "multi_sentence",
+      "question": "Where may I announce my own project, and what disclosures do I need if I include an affiliate link?",
+      "expected_answer": "Use the weekly showcase thread, clearly state your connection to the project, and mark affiliate links before readers follow them. Do not copy the promotion into unrelated threads.",
+      "relevant_chunk_ids": [
+        "community:2"
+      ],
+      "should_answer": true,
+      "notes": "Evidence: Promotional posts; disclosure does not authorise cross-thread spam."
+    },
+    {
+      "id": "community-07",
+      "document_id": "community",
+      "category": "unanswerable",
+      "question": "How many reports must a post receive before an automatic temporary removal?",
+      "expected_answer": null,
+      "relevant_chunk_ids": [],
+      "should_answer": false,
+      "notes": "Whole document reviewed: review considers content rather than report count; no automatic-removal threshold is provided."
+    },
+    {
+      "id": "community-08",
+      "document_id": "community",
+      "category": "unanswerable",
+      "question": "After a permanent ban, how many days must someone wait before applying for reinstatement?",
+      "expected_answer": null,
+      "relevant_chunk_ids": [],
+      "should_answer": false,
+      "notes": "Whole document reviewed: the general 14-day appeal window is not a waiting period or a reinstatement rule after a permanent ban."
+    },
+    {
+      "id": "ai-01",
+      "document_id": "ai",
+      "category": "direct_fact",
+      "question": "What is the ordinary retention period for prompt and output logs?",
+      "expected_answer": "30 days, after which they are deleted unless they are part of an active abuse investigation.",
+      "relevant_chunk_ids": [
+        "ai:2"
+      ],
+      "should_answer": true,
+      "notes": "Evidence: Operational retention; the ordinary duration has an explicit investigation exception."
+    },
+    {
+      "id": "ai-02",
+      "document_id": "ai",
+      "category": "qualifier_sensitive",
+      "question": "Is replacing a patient's name with initials enough to let me submit their otherwise identifiable medical record?",
+      "expected_answer": "No. Initials do not make an otherwise identifiable medical record acceptable, and another person's medical records must not be submitted.",
+      "relevant_chunk_ids": [
+        "ai:3"
+      ],
+      "should_answer": true,
+      "notes": "Evidence: Sensitive inputs; superficial redaction does not waive the restriction."
+    },
+    {
+      "id": "ai-03",
+      "document_id": "ai",
+      "category": "paraphrased",
+      "question": "If Lumen writes an answer with convincing-looking citations, can I send it to a customer without checking those citations?",
+      "expected_answer": "No. The member must check generated facts and quoted sources before sharing outside the workspace; a fluent citation is not certified to exist.",
+      "relevant_chunk_ids": [
+        "ai:4"
+      ],
+      "should_answer": true,
+      "notes": "Evidence: Review of outputs; copy convenience and fluency do not replace verification."
+    },
+    {
+      "id": "ai-04",
+      "document_id": "ai",
+      "category": "multi_chunk",
+      "question": "Does the ban on training general-purpose models with my prompts also mean no prompt logs are retained?",
+      "expected_answer": "No. Lumen and its contracted provider may not train their general-purpose models on submitted content, but prompt and output logs are retained for 30 days for troubleshooting and abuse investigation, or until an active investigation closes if held.",
+      "relevant_chunk_ids": [
+        "ai:1",
+        "ai:2"
+      ],
+      "should_answer": true,
+      "notes": "Prompt handling supplies both training restrictions; Operational retention supplies logging and the hold exception."
+    },
+    {
+      "id": "ai-05",
+      "document_id": "ai",
+      "category": "negative_exception",
+      "question": "Can a manager make AI's candidate ranking the sole hiring decision if they are confident in it?",
+      "expected_answer": "No. AI output must not be the sole basis for employment decisions. A qualified human must assess underlying evidence and take responsibility, regardless of confidence or an administrator's instruction.",
+      "relevant_chunk_ids": [
+        "ai:5"
+      ],
+      "should_answer": true,
+      "notes": "Evidence: High-impact decisions; confidence, numerical ranking and manager authority do not waive human assessment."
+    },
+    {
+      "id": "ai-06",
+      "document_id": "ai",
+      "category": "multi_sentence",
+      "question": "Does an internal AI-generated image need a public disclosure label, and what changes if an edited version is used in a public campaign?",
+      "expected_answer": "A private internal draft not distributed publicly does not need that label. A public campaign image or caption must clearly disclose its AI origin, even after substantial editing.",
+      "relevant_chunk_ids": [
+        "ai:6"
+      ],
+      "should_answer": true,
+      "notes": "Evidence: Generated media disclosure; distinguish private audience from public campaign and preserve disclosure after editing."
+    },
+    {
+      "id": "ai-07",
+      "document_id": "ai",
+      "category": "unanswerable",
+      "question": "What is the name and exact version of the model used by Lumen to generate drafts?",
+      "expected_answer": null,
+      "relevant_chunk_ids": [],
+      "should_answer": false,
+      "notes": "Whole document reviewed: a contracted provider is mentioned but neither vendor identity nor model/version is specified."
+    },
+    {
+      "id": "ai-08",
+      "document_id": "ai",
+      "category": "unanswerable",
+      "question": "How long does Lumen retain voice recordings used by its speech-to-text AI feature?",
+      "expected_answer": null,
+      "relevant_chunk_ids": [],
+      "should_answer": false,
+      "notes": "Whole document reviewed: only drafting/summarisation prompts and outputs are covered, not a voice feature or recording retention. Do not generalise the 30-day log rule."
+    },
+    {
+      "id": "cookies-01",
+      "document_id": "cookies",
+      "category": "direct_fact",
+      "question": "How long does the sign-in security cookie last, and is it optional?",
+      "expected_answer": "It expires after 24 hours and is essential, not optional.",
+      "relevant_chunk_ids": [
+        "cookies:1"
+      ],
+      "should_answer": true,
+      "notes": "Evidence: Security cookies; distinguish the security cookie from the session cookie."
+    },
+    {
+      "id": "cookies-02",
+      "document_id": "cookies",
+      "category": "paraphrased",
+      "question": "Will saying no to optional traffic measurement stop me from using my existing reading shelf?",
+      "expected_answer": "No. Declining analytics consent does not prevent access to an existing reading shelf or public catalogue pages.",
+      "relevant_chunk_ids": [
+        "cookies:2"
+      ],
+      "should_answer": true,
+      "notes": "Evidence: Analytics cookies; optional consent is distinct from blocking essential authentication cookies."
+    },
+    {
+      "id": "cookies-03",
+      "document_id": "cookies",
+      "category": "qualifier_sensitive",
+      "question": "If I consented to analytics, will simply opening an article also load its third-party video player?",
+      "expected_answer": "No. The player loads only after the reader activates the preview and accepts the media consent prompt; opening the article or giving analytics consent is not enough.",
+      "relevant_chunk_ids": [
+        "cookies:5"
+      ],
+      "should_answer": true,
+      "notes": "Evidence: Embedded media; media activation and consent are separate from analytics consent."
+    },
+    {
+      "id": "cookies-04",
+      "document_id": "cookies",
+      "category": "semantic_confusion",
+      "question": "Is the 13-month aggregate reporting period also the lifetime of the analytics cookie?",
+      "expected_answer": "No. The optional analytics cookie expires after 90 days, while de-identified aggregate reports are retained for 13 months.",
+      "relevant_chunk_ids": [
+        "cookies:2",
+        "cookies:3"
+      ],
+      "should_answer": true,
+      "notes": "Analytics cookies and Aggregate measurement are both required; browser identifier and aggregate report have different lifetimes."
+    },
+    {
+      "id": "cookies-05",
+      "document_id": "cookies",
+      "category": "multi_sentence",
+      "question": "When I withdraw optional-cookie consent on my laptop, what happens there, on my phone, and to existing aggregate reports?",
+      "expected_answer": "New optional analytics collection stops and Cedar removes its optional analytics cookie on that browser. The phone's browser preference is not automatically changed, and existing non-identifying aggregate reports are not deleted.",
+      "relevant_chunk_ids": [
+        "cookies:4"
+      ],
+      "should_answer": true,
+      "notes": "Preference controls directly states all three withdrawal effects. Aggregate measurement discusses removing a cookie, not the browser-specific consent operation."
+    },
+    {
+      "id": "cookies-06",
+      "document_id": "cookies",
+      "category": "negative_exception",
+      "question": "Does clearing every browser cookie delete my library account and saved shelf?",
+      "expected_answer": "No. It may sign the reader out and erase that browser's remembered consent choice, but it does not delete the server-side account or saved shelf.",
+      "relevant_chunk_ids": [
+        "cookies:7"
+      ],
+      "should_answer": true,
+      "notes": "Browser maintenance describes removing all cookies. Security cookies also states clearing its own cookie leaves account/shelf intact, but not the all-cookie operation or lost consent choice."
+    },
+    {
+      "id": "cookies-07",
+      "document_id": "cookies",
+      "category": "unanswerable",
+      "question": "Which named analytics company receives Cedar's optional analytics events?",
+      "expected_answer": null,
+      "relevant_chunk_ids": [],
+      "should_answer": false,
+      "notes": "Whole document reviewed: analytics purposes and retention are given, but no analytics company is named."
+    },
+    {
+      "id": "cookies-08",
+      "document_id": "cookies",
+      "category": "unanswerable",
+      "question": "How long does the third-party video provider keep its advertising cookies after I play a video?",
+      "expected_answer": null,
+      "relevant_chunk_ids": [],
+      "should_answer": false,
+      "notes": "Whole document reviewed: third-party cookies are governed by the provider's separate policy; no duration is supplied. Cedar's own cookie lifetimes do not answer this."
+    }
+  ]
+}

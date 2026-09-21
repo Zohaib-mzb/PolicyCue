@@ -1,0 +1,8 @@
+# Install into an evaluation virtualenv after backend/requirements.txt.
+# Respect production pins; no evaluation imports occur during FastAPI startup.
+-c requirements.txt
+ragas==0.4.3
+# Required for the supported google-genai adapter; RAGAS leaves this unbounded.
+instructor[google-genai]==1.14.5
+# 0.4.2 removed vertexai imports that RAGAS 0.4.3 still loads internally.
+langchain-community==0.4.1

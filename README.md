@@ -372,3 +372,58 @@ Built as a production-style portfolio project focused on secure document ingesti
 Copyright © 2026 Muhammad Zohaib. All Rights Reserved.
 
 Source code is publicly visible for portfolio and evaluation purposes. Reuse, redistribution, modification, deployment, or commercial/non-commercial use is not granted without prior written permission. See [LICENSE](LICENSE).
+
+## RAG Evaluation
+
+PolicyCue includes an isolated, opt-in evaluation runner in `backend/evaluation/`.
+A fixed, version-controlled benchmark makes regressions comparable without changing
+production retrieval, prompts, models, chunking, API contracts, or frontend behavior.
+The included **PolicyCue Eval v1 controlled benchmark** contains 50 questions over six
+fixed synthetic policy documents (38 answerable, 12 unanswerable). It is not representative
+of all real-world policy documents; no benchmark scores are published here.
+
+Install evaluation dependencies in a separate environment, from the repository root:
+
+```bash
+python3 -m venv .venv-evaluation
+.venv-evaluation/bin/python -m pip install -r backend/requirements.txt -r backend/requirements-evaluation.txt
+
+# Offline: validate the dataset and print the real chunks for label review.
+PYTHONPATH=. .venv-evaluation/bin/python -m backend.evaluation.evaluator --validate-only
+
+# Live, explicitly opt-in: uses existing .env Gemini/Pinecone credentials and incurs API usage.
+PYTHONPATH=. .venv-evaluation/bin/python -m backend.evaluation.evaluator \
+  --dataset backend/evaluation/dataset.json --k 5
+
+# Offline unit tests (no external service calls).
+PYTHONPATH=. .venv-evaluation/bin/python -m pytest backend/evaluation/tests -q
+```
+
+`--skip-ragas` disables the semantic judge but **still uses live Pinecone embeddings,
+retrieval, and Gemini answer generation**. `--judge-model` overrides the judge model;
+the default is the existing `GEMINI_MODEL`. `--output-dir` selects the report directory.
+RAGAS is optional and never imported by FastAPI. Its own package requires OpenAI and
+LangChain integrations transitively; the runner creates no OpenAI client and requires
+no OpenAI key or additional service. See [evaluation notes](backend/evaluation/README.md)
+for API compatibility, dataset labeling, scope safety, and metric eligibility.
+
+| Metric | Meaning |
+| --- | --- |
+| Recall@k | Distinct labeled relevant chunks retrieved / all labeled relevant chunks. |
+| Precision@k | Distinct labeled relevant chunks retrieved / k, including when fewer results return. |
+| RR / MRR | Reciprocal rank of the first relevant chunk in top-k; MRR averages eligible examples. |
+| Faithfulness | RAGAS `Faithfulness`: generated claims supported by retrieved contexts. |
+| Answer Relevancy | RAGAS `AnswerRelevancy`: generated-question similarity to the actual question, using production Pinecone query embeddings. |
+| Context Relevancy | RAGAS `ContextPrecision`: rank-sensitive precision of contexts judged useful against the reference answer; a proxy, not the removed legacy context-relevancy metric. |
+| Citation Correctness | Fraction of distinct reported source chunks in the labeled relevant evidence set. Also records supporting-citation coverage and incorrect/missing evidence counts. |
+| Abstention Accuracy | Whether the actual answer/fallback matches `should_answer`, with separate answerable/unanswerable accuracies and four confusion counts. |
+
+Retrieval metrics exclude examples with no relevant evidence labels. Semantic metrics
+use actual pipeline outputs; unsupported responses are excluded from faithfulness and
+answer relevancy, while reference-based context precision remains eligible for an
+answerable question even if generation abstained. JSON reports contain every example's
+ordered contexts, source metadata, answers, metric eligibility/error status, sample
+counts, benchmark hash/version, model/package versions, and cleanup outcomes. Terminal
+summaries show actual computed values or N/A; nulls are never averaged as zeros.
+LLM-judge metrics can vary slightly. Scores only describe the labeled benchmark/version
+used, and failed/incomplete runs must not be compared as complete benchmark runs.

@@ -1,0 +1,64 @@
+{
+  "name": "policycue-synthetic-starter",
+  "version": "1",
+  "synthetic": true,
+  "description": "Four synthetic smoke-test cases, not a representative production benchmark. Fixed source text and evidence labels are version controlled.",
+  "documents": [
+    {
+      "id": "refund-policy",
+      "text": "Synthetic PolicyCue evaluation fixture — Refund Policy v1.\nCustomers may request a refund within 30 days of purchase. Refund requests must include the order number and be sent to refunds@example.invalid. Approved refunds are returned to the original payment method within 7 business days. Items damaged by customer misuse are not eligible for a refund.",
+      "chunk_sha256": [
+        "99b65e4bf086b6db46db4ed54e8d0bffb12c5cfc75e5c01826319a2c68633d79"
+      ]
+    },
+    {
+      "id": "privacy-policy",
+      "text": "Synthetic PolicyCue evaluation fixture — Privacy Policy v1.\nWe collect account email addresses to send service notifications. We retain support tickets for 90 days after closure. Customers can request deletion of their account by writing to privacy@example.invalid. We do not sell account email addresses.",
+      "chunk_sha256": [
+        "d85aea8b083193cd057ce6ac61c9063fa6debcddf4aa9f200834a3da94d4eb8c"
+      ]
+    }
+  ],
+  "examples": [
+    {
+      "id": "refund-001",
+      "document_id": "refund-policy",
+      "question": "Within how many days may a customer request a refund?",
+      "expected_answer": "Within 30 days of purchase.",
+      "should_answer": true,
+      "relevant_chunk_ids": [
+        "refund-policy:0"
+      ],
+      "category": "supported"
+    },
+    {
+      "id": "refund-002",
+      "document_id": "refund-policy",
+      "question": "Does the company offer free international shipping?",
+      "expected_answer": null,
+      "should_answer": false,
+      "relevant_chunk_ids": [],
+      "category": "absent-fact"
+    },
+    {
+      "id": "privacy-001",
+      "document_id": "privacy-policy",
+      "question": "How long are support tickets retained after closure?",
+      "expected_answer": "For 90 days after closure.",
+      "should_answer": true,
+      "relevant_chunk_ids": [
+        "privacy-policy:0"
+      ],
+      "category": "supported"
+    },
+    {
+      "id": "privacy-002",
+      "document_id": "privacy-policy",
+      "question": "In which country are the servers located?",
+      "expected_answer": null,
+      "should_answer": false,
+      "relevant_chunk_ids": [],
+      "category": "absent-fact"
+    }
+  ]
+}
