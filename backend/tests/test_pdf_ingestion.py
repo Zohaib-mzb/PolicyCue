@@ -7,6 +7,7 @@ from starlette.requests import Request
 from starlette.responses import Response
 
 from backend.app.main import ingest_pdf
+from backend.app.retrieval.vector_store import VectorStorageError
 from backend.app.core.session import SESSION_COOKIE_NAME, create_session_token
 from backend.app.core.rate_limit import reset_rate_limits
 
@@ -89,6 +90,46 @@ async def test_pdf_cleanup_failure_keeps_original_error(caplog):
     assert caught.value.status_code == 503
     assert caught.value.detail == "Document storage failed. Please retry ingestion."
     assert "failed-pdf-cleanup" in caplog.text
+
+
+@pytest.mark.anyio
+async def test_later_pdf_batch_failure_logs_context_and_attempts_owned_cleanup(caplog):
+    owner_id = "99999999-9999-4999-8999-999999999999"
+    http_request, response = _owned_request_response(owner_id)
+    file = UploadFile(
+        filename="large-policy.pdf",
+        file=BytesIO(b"%PDF"),
+        headers={"content-type": "application/pdf"},
+    )
+    provider_error = RuntimeError("provider rejected batch; api_key=must-not-appear")
+    storage_error = VectorStorageError(
+        stage="upsert",
+        total_chunks=65,
+        batch_number=3,
+        batch_size=1,
+    )
+    storage_error.__cause__ = provider_error
+
+    with patch("backend.app.main.uuid4", return_value="failed-large-pdf"), patch(
+        "backend.app.main.extract_pdf_text", return_value="Policy text"
+    ), patch(
+        "backend.app.main.chunk_text", return_value=[f"chunk-{index}" for index in range(65)]
+    ), patch(
+        "backend.app.main.store_chunks", side_effect=storage_error
+    ), patch("backend.app.main.delete_document_vectors") as cleanup:
+        with pytest.raises(HTTPException) as caught:
+            await ingest_pdf(http_request, response, file)
+
+    assert caught.value.status_code == 503
+    assert caught.value.detail == "Document storage failed. Please retry ingestion."
+    assert "provider rejected batch" not in caught.value.detail
+    cleanup.assert_called_once_with("failed-large-pdf", owner_id)
+    assert "stage=upsert" in caplog.text
+    assert "total_chunks=65" in caplog.text
+    assert "batch_number=3" in caplog.text
+    assert "batch_size=1" in caplog.text
+    assert "must-not-appear" not in caplog.text
+    assert "[REDACTED]" in caplog.text
 
 from backend.app.main import (
     MAX_FILENAME_METADATA_LENGTH,

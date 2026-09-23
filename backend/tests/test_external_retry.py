@@ -28,6 +28,12 @@ class RetryAfterError(Exception):
         )()
 
 
+class PineconeRetryAfterError(Exception):
+    status_code = 429
+    retry_after = 30
+    headers = {"x-request-id": "request-123"}
+
+
 class Settings:
     external_retry_attempts = 3
     external_retry_base_delay_seconds = 0.5
@@ -68,6 +74,18 @@ def test_backoff_is_bounded_and_respects_retry_after(monkeypatch):
     with patch("backend.app.core.external_retry.time.sleep") as sleep:
         with pytest.raises(RetryAfterError):
             retry_external(lambda: (_ for _ in ()).throw(RetryAfterError()))
+
+    assert [call.args[0] for call in sleep.call_args_list] == [2.0, 2.0]
+
+
+def test_backoff_supports_pinecone_retry_after_attribute(monkeypatch):
+    monkeypatch.setattr("backend.app.core.external_retry.get_settings", lambda: Settings())
+
+    with patch("backend.app.core.external_retry.time.sleep") as sleep:
+        with pytest.raises(PineconeRetryAfterError):
+            retry_external(
+                lambda: (_ for _ in ()).throw(PineconeRetryAfterError())
+            )
 
     assert [call.args[0] for call in sleep.call_args_list] == [2.0, 2.0]
 

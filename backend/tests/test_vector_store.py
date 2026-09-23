@@ -1,6 +1,8 @@
 from unittest.mock import patch
 
 from backend.app.retrieval.vector_store import (
+    VECTOR_STORAGE_BATCH_SIZE,
+    VectorStorageError,
     delete_document_vectors,
     search_chunks,
     store_chunks,
@@ -56,14 +58,70 @@ def test_store_chunks_rejects_embedding_count_mismatch():
                 document_id="test-document",
                 chunks=["First chunk", "Second chunk"],
             )
-        except RuntimeError as exc:
-            assert "Embedding count mismatch" in str(exc)
+        except VectorStorageError as exc:
+            assert exc.stage == "embedding"
+            assert "Embedding count mismatch" in str(exc.__cause__)
         else:
             raise AssertionError(
                 "Expected RuntimeError for embedding count mismatch."
             )
 
         mock_index.upsert.assert_not_called()
+
+
+def test_store_chunks_batches_embeddings_and_upserts_with_global_indexes():
+    chunks = [f"chunk-{index}" for index in range(VECTOR_STORAGE_BATCH_SIZE * 2 + 3)]
+    metadata = [
+        {"source_type": "text", "title": f"title-{index}"}
+        for index in range(len(chunks))
+    ]
+
+    def embeddings(batch):
+        return [[float(index)] * 768 for index in range(len(batch))]
+
+    with patch(
+        "backend.app.retrieval.vector_store.create_document_embeddings",
+        side_effect=embeddings,
+    ) as embed, patch("backend.app.retrieval.vector_store.index") as mock_index:
+        store_chunks(
+            "large-document",
+            chunks,
+            owner_id="owner-a",
+            chunk_metadata=metadata,
+        )
+
+    assert [len(call.args[0]) for call in embed.call_args_list] == [32, 32, 3]
+    batches = [call.kwargs["vectors"] for call in mock_index.upsert.call_args_list]
+    assert [len(batch) for batch in batches] == [32, 32, 3]
+    vectors = [vector for batch in batches for vector in batch]
+    assert [vector["metadata"]["chunk_index"] for vector in vectors] == list(range(67))
+    assert [vector["id"] for vector in vectors] == [
+        f"large-document-{index}" for index in range(67)
+    ]
+    assert all(vector["metadata"]["document_id"] == "large-document" for vector in vectors)
+    assert all(vector["metadata"]["owner_id"] == "owner-a" for vector in vectors)
+    assert [vector["metadata"]["title"] for vector in vectors] == [
+        f"title-{index}" for index in range(67)
+    ]
+
+
+def test_store_chunks_reports_later_batch_failure():
+    chunks = [f"chunk-{index}" for index in range(VECTOR_STORAGE_BATCH_SIZE + 1)]
+
+    with patch(
+        "backend.app.retrieval.vector_store.create_document_embeddings",
+        side_effect=lambda batch: [[0.1] * 768 for _ in batch],
+    ), patch("backend.app.retrieval.vector_store.index") as mock_index:
+        mock_index.upsert.side_effect = [None, RuntimeError("provider rejected batch")]
+        try:
+            store_chunks("partial-document", chunks, owner_id="owner-a")
+        except VectorStorageError as exc:
+            assert exc.stage == "upsert"
+            assert exc.total_chunks == 33
+            assert exc.batch_number == 2
+            assert exc.batch_size == 1
+        else:
+            raise AssertionError("Expected the second batch to fail.")
 
 
 def test_search_chunks_filters_by_document_id():

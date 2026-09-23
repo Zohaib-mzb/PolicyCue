@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import re
 from uuid import UUID, uuid4
 
 from fastapi import FastAPI, File, HTTPException, Request, Response, UploadFile
@@ -21,6 +22,7 @@ from backend.app.ingestion.policy_discovery import (
 )
 from backend.app.ingestion.url_fetcher import URLFetchError
 from backend.app.retrieval.vector_store import (
+    VectorStorageError,
     answer_question,
     delete_document_vectors,
     store_chunks,
@@ -242,6 +244,7 @@ def _ingest_pdf_document(content: bytes, filename: str | None, owner_id: str) ->
             owner_id=owner_id,
         )
     except Exception as exc:
+        _log_storage_failure(exc, document_id, len(chunks))
         _cleanup_failed_document(document_id, owner_id)
         raise HTTPException(
             status_code=503,
@@ -265,17 +268,77 @@ async def health():
     return {"status": "ok"}
 
 
-# Keep URL embedding/upsert requests small without changing the PDF path.
+# Keep website page groups small before passing them to bounded vector storage.
 URL_CHUNK_BATCH_SIZE = 32
+
+
+def _provider_exception(exc: Exception) -> Exception:
+    if isinstance(exc, VectorStorageError) and exc.__cause__ is not None:
+        return exc.__cause__
+    return exc
+
+
+def _provider_status(exc: Exception) -> int | None:
+    provider_exc = _provider_exception(exc)
+    status = getattr(provider_exc, "status", None)
+    if not isinstance(status, int):
+        status = getattr(provider_exc, "status_code", None)
+    if not isinstance(status, int):
+        status = getattr(provider_exc, "code", None)
+    return status if isinstance(status, int) else None
+
+
+def _provider_request_id(exc: Exception) -> str | None:
+    provider_exc = _provider_exception(exc)
+    request_id = getattr(provider_exc, "request_id", None)
+    if request_id:
+        return str(request_id)[:200]
+    headers = getattr(provider_exc, "headers", None)
+    if headers:
+        request_id = headers.get("x-request-id") or headers.get("x-pinecone-request-id")
+    return str(request_id)[:200] if request_id else None
+
+
+def _sanitized_error_message(exc: Exception) -> str:
+    provider_exc = _provider_exception(exc)
+    message = getattr(provider_exc, "message", None) or str(provider_exc)
+    sanitized = " ".join(str(message).split())
+    sanitized = re.sub(
+        r"(?i)(api[-_ ]?key|authorization|cookie|secret)(\s*[:=]\s*)([^\s,;]+)",
+        r"\1\2[REDACTED]",
+        sanitized,
+    )
+    return sanitized[:500]
+
+
+def _log_storage_failure(exc: Exception, document_id: str, total_chunks: int) -> None:
+    logger.error(
+        "Vector storage failed stage=%s document_id=%s total_chunks=%s "
+        "batch_number=%s batch_size=%s exception_type=%s provider_status=%s "
+        "provider_request_id=%s provider_message=%s",
+        getattr(exc, "stage", "storage"),
+        document_id,
+        getattr(exc, "total_chunks", total_chunks),
+        getattr(exc, "batch_number", None),
+        getattr(exc, "batch_size", None),
+        type(_provider_exception(exc)).__name__,
+        _provider_status(exc),
+        _provider_request_id(exc),
+        _sanitized_error_message(exc),
+    )
 
 
 def _cleanup_failed_document(document_id: str, owner_id: str) -> None:
     try:
         delete_document_vectors(document_id, owner_id)
-    except Exception:
+    except Exception as exc:
         logger.warning(
-            "Failed to clean up vectors after ingestion failure for document_id=%s.",
+            "Failed to clean up vectors after ingestion failure document_id=%s "
+            "exception_type=%s provider_status=%s provider_message=%s",
             document_id,
+            type(_provider_exception(exc)).__name__,
+            _provider_status(exc),
+            _sanitized_error_message(exc),
         )
 
 

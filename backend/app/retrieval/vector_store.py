@@ -18,6 +18,24 @@ index = pinecone.Index(
     settings.pinecone_index_name,
 )
 
+VECTOR_STORAGE_BATCH_SIZE = 32
+
+
+class VectorStorageError(RuntimeError):
+    def __init__(
+        self,
+        *,
+        stage: str,
+        total_chunks: int,
+        batch_number: int,
+        batch_size: int,
+    ) -> None:
+        super().__init__(f"Vector storage failed during {stage}.")
+        self.stage = stage
+        self.total_chunks = total_chunks
+        self.batch_number = batch_number
+        self.batch_size = batch_size
+
 
 def store_chunks(
     document_id: str,
@@ -35,45 +53,61 @@ def store_chunks(
     if chunk_metadata is not None and len(chunk_metadata) != len(chunks):
         raise ValueError("Chunk metadata count must match chunk count.")
 
-    embeddings = create_document_embeddings(chunks)
+    for start in range(0, len(chunks), VECTOR_STORAGE_BATCH_SIZE):
+        batch = chunks[start:start + VECTOR_STORAGE_BATCH_SIZE]
+        batch_number = start // VECTOR_STORAGE_BATCH_SIZE + 1
+        try:
+            embeddings = create_document_embeddings(batch)
+            if len(embeddings) != len(batch):
+                raise RuntimeError(
+                    "Embedding count mismatch: "
+                    f"expected {len(batch)}, "
+                    f"received {len(embeddings)}."
+                )
+        except Exception as exc:
+            raise VectorStorageError(
+                stage="embedding",
+                total_chunks=len(chunks),
+                batch_number=batch_number,
+                batch_size=len(batch),
+            ) from exc
 
-    if len(embeddings) != len(chunks):
-        raise RuntimeError(
-            "Embedding count mismatch: "
-            f"expected {len(chunks)}, "
-            f"received {len(embeddings)}."
-        )
+        vectors = [
+            {
+                "id": f"{document_id}-{i + chunk_index_offset}",
+                "values": embedding,
+                "metadata": {
+                    "document_id": document_id,
+                    "owner_id": owner_id or "",
+                    "text": chunk,
+                    "chunk_index": i + chunk_index_offset,
+                    "source": source,
+                    "filename": filename or "",
+                },
+            }
+            for i, (chunk, embedding) in enumerate(
+                zip(batch, embeddings),
+                start=start,
+            )
+        ]
 
-    vectors = [
-        {
-            "id": f"{document_id}-{i + chunk_index_offset}",
-            "values": embedding,
-            "metadata": {
-                "document_id": document_id,
-                "owner_id": owner_id or "",
-                "text": chunk,
-                "chunk_index": i + chunk_index_offset,
-                "source": source,
-                "filename": filename or "",
-            },
-        }
-        for i, (chunk, embedding) in enumerate(
-            zip(chunks, embeddings)
-        )
-    ]
+        if chunk_metadata is not None:
+            batch_metadata = chunk_metadata[start:start + len(batch)]
+            for vector, metadata in zip(vectors, batch_metadata):
+                for key in ("source_url", "source_urls", "policy_categories", "content_hash", "source_type", "title"):
+                    if key in metadata:
+                        vector["metadata"][key] = metadata[key]
+                vector["metadata"]["source"] = metadata.get("source_url", source)
 
-    if chunk_metadata is not None:
-        for vector, metadata in zip(vectors, chunk_metadata):
-            for key in ("source_url", "source_urls", "policy_categories", "content_hash", "source_type", "title"):
-                if key in metadata:
-                    vector["metadata"][key] = metadata[key]
-            vector["metadata"]["source"] = metadata.get("source_url", source)
-
-    retry_external(
-        lambda: index.upsert(
-            vectors=vectors,
-        )
-    )
+        try:
+            retry_external(lambda: index.upsert(vectors=vectors))
+        except Exception as exc:
+            raise VectorStorageError(
+                stage="upsert",
+                total_chunks=len(chunks),
+                batch_number=batch_number,
+                batch_size=len(batch),
+            ) from exc
 
 
 def delete_document_vectors(document_id: str, owner_id: str) -> None:

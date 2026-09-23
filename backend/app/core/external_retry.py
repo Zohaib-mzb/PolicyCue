@@ -35,12 +35,14 @@ def _status_code(exc: Exception) -> int | None:
 
 
 def _retry_after_seconds(exc: Exception) -> float | None:
-    response = getattr(exc, "response", None)
-    headers = getattr(response, "headers", None)
-    if not headers:
-        return None
-
-    value = headers.get("retry-after") or headers.get("Retry-After")
+    value = getattr(exc, "retry_after", None)
+    if value is None:
+        headers = getattr(exc, "headers", None)
+        if not headers:
+            response = getattr(exc, "response", None)
+            headers = getattr(response, "headers", None)
+        if headers:
+            value = headers.get("retry-after") or headers.get("Retry-After")
     try:
         delay = float(value)
     except (TypeError, ValueError):
