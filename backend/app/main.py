@@ -485,6 +485,7 @@ async def ask_question(request: QuestionRequest, http_request: Request):
     )
     owner_id = require_owner_id(http_request)
     if owner_id is None:
+        logger.warning("ask_document_not_found reason=invalid_session")
         raise HTTPException(
             status_code=404,
             detail=DOCUMENT_NOT_FOUND_DETAIL,
@@ -504,6 +505,10 @@ async def ask_question(request: QuestionRequest, http_request: Request):
             detail="Question answering is temporarily unavailable. Please retry later.",
         ) from exc
     if not result["sources"] and not result.get("document_found"):
+        logger.warning(
+            "ask_document_not_found reason=no_owner_scoped_vectors document_id=%r",
+            request.document_id,
+        )
         raise HTTPException(
             status_code=404,
             detail=DOCUMENT_NOT_FOUND_DETAIL,

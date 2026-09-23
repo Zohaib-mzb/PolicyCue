@@ -1,5 +1,6 @@
 from unittest.mock import patch
 
+import pytest
 from fastapi.testclient import TestClient
 
 from backend.app.core.session import (
@@ -115,6 +116,47 @@ def test_invalid_session_cookie_fails_safely_without_lookup():
     assert response.status_code == 404
     assert response.json() == {"detail": "Document not found."}
     answer.assert_not_called()
+
+
+@pytest.mark.parametrize("session", ["missing", "invalid", "valid"])
+def test_ask_not_found_diagnostics_preserve_response_and_omit_sensitive_data(session, caplog):
+    owner_id = "11111111-1111-4111-8111-111111111111"
+    secret = "diagnostic-test-secret-not-for-logging"
+    question = "Private question that must not be logged"
+    document_id = "diagnostic-document\nforged-event"
+    client = TestClient(app)
+
+    with patch("backend.app.core.session.get_settings") as settings:
+        settings.return_value.secret_key = secret
+        token = create_session_token(owner_id)
+        cookie = token if session == "valid" else "invalid-private-cookie"
+        if session != "missing":
+            client.cookies.set(SESSION_COOKIE_NAME, cookie)
+
+        with patch(
+            "backend.app.main.answer_question",
+            return_value={"answer": "No answer", "sources": [], "document_found": False},
+        ) as answer:
+            response = client.post(
+                "/api/v1/ask",
+                json={"question": question, "document_id": document_id},
+            )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Document not found."}
+    assert "set-cookie" not in response.headers
+    events = [record.getMessage() for record in caplog.records if record.name == "backend.app.main"]
+    if session == "valid":
+        answer.assert_called_once_with(question, 5, document_id, owner_id)
+        assert events == [
+            f"ask_document_not_found reason=no_owner_scoped_vectors document_id={document_id!r}"
+        ]
+    else:
+        answer.assert_not_called()
+        assert events == ["ask_document_not_found reason=invalid_session"]
+    assert all("\n" not in event for event in events)
+    for sensitive in (owner_id, secret, token, cookie, question):
+        assert sensitive not in caplog.text
 
 
 def test_expired_session_token_fails_safely():
