@@ -2,6 +2,7 @@ import base64
 import hashlib
 import hmac
 import json
+import logging
 import time
 from uuid import UUID, uuid4
 
@@ -12,6 +13,7 @@ from backend.app.core.config import get_settings
 
 SESSION_COOKIE_NAME = "policylens_session"
 SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 30
+logger = logging.getLogger(__name__)
 
 
 def _b64encode(data: bytes) -> str:
@@ -41,25 +43,32 @@ def create_session_token(owner_id: str) -> str:
     return f"{payload}.{_sign(payload)}"
 
 
-def read_owner_id_from_token(token: str | None) -> str | None:
-    if not token or "." not in token:
-        return None
+def _read_session_token(token: str | None) -> tuple[str | None, str | None]:
+    if not token:
+        return None, "missing_cookie"
+    if "." not in token:
+        return None, "malformed_cookie"
 
     payload, signature = token.split(".", 1)
     expected_signature = _sign(payload)
     if not hmac.compare_digest(signature, expected_signature):
-        return None
+        return None, "invalid_signature"
 
     try:
         data = json.loads(_b64decode(payload))
         owner_id = data["owner_id"]
         issued_at = int(data["iat"])
         if int(time.time()) - issued_at > SESSION_MAX_AGE_SECONDS:
-            return None
+            return None, "expired_cookie"
         UUID(owner_id)
     except Exception:
-        return None
+        return None, "invalid_payload"
 
+    return owner_id, None
+
+
+def read_owner_id_from_token(token: str | None) -> str | None:
+    owner_id, _ = _read_session_token(token)
     return owner_id
 
 
@@ -87,7 +96,11 @@ def get_or_create_owner_id(request: Request, response: Response) -> str:
     return owner_id
 
 
-def require_owner_id(request: Request) -> str | None:
-    return read_owner_id_from_token(
+def require_owner_id(request: Request, *, log_failure: bool = False) -> str | None:
+    owner_id, reason = _read_session_token(
         request.cookies.get(SESSION_COOKIE_NAME)
     )
+    if log_failure and reason:
+        # Only fixed reason codes: never include cookie, payload, or owner data.
+        logger.warning("ask_session_rejected reason=%s", reason)
+    return owner_id

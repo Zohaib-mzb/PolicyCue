@@ -483,7 +483,7 @@ async def ask_question(request: QuestionRequest, http_request: Request):
         scope="ask",
         limit=settings.ask_rate_limit,
     )
-    owner_id = require_owner_id(http_request)
+    owner_id = require_owner_id(http_request, log_failure=True)
     if owner_id is None:
         logger.warning("ask_document_not_found reason=invalid_session")
         raise HTTPException(
