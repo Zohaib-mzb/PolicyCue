@@ -10,7 +10,11 @@ from pydantic import BaseModel, Field, HttpUrl
 
 from backend.app.core.config import get_settings
 from backend.app.core.rate_limit import check_client_rate_limit, check_rate_limit
-from backend.app.core.session import get_or_create_owner_id, require_owner_id
+from backend.app.core.session import (
+    SESSION_HEADER_NAME,
+    get_or_create_owner_session,
+    require_owner_id,
+)
 from backend.app.ingestion.chunker import chunk_text
 from backend.app.ingestion.pdf_processor import (
     MAX_PDF_SIZE,
@@ -43,7 +47,7 @@ app.add_middleware(
     allow_origins=settings.cors_allowed_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
-    allow_headers=["Content-Type", "Authorization"],
+    allow_headers=["Content-Type", "Authorization", SESSION_HEADER_NAME],
 )
 
 
@@ -108,6 +112,13 @@ DOCUMENT_NOT_FOUND_DETAIL = "Document not found."
 MIN_TEXT_CHARS = 50
 MAX_TEXT_CHARS = 100_000
 DEFAULT_TEXT_TITLE = "Pasted text"
+
+
+def _ingestion_session(request: Request, response: Response) -> tuple[str, str]:
+    owner_id, session_token = get_or_create_owner_session(request, response)
+    if owner_id is None or session_token is None:
+        raise HTTPException(status_code=404, detail=DOCUMENT_NOT_FOUND_DETAIL)
+    return owner_id, session_token
 
 
 def _prepare_url_document(document: dict) -> tuple[list[str], list[dict], dict, list[dict]]:
@@ -353,7 +364,7 @@ async def ingest_url(
         scope="ingest",
         limit=settings.ingestion_client_rate_limit,
     )
-    owner_id = get_or_create_owner_id(http_request, response)
+    owner_id, session_token = _ingestion_session(http_request, response)
     check_rate_limit(
         http_request,
         scope="ingest",
@@ -406,6 +417,7 @@ async def ingest_url(
         "fallback_used": document.get("fallback_used", "none"),
         "fallback": document.get("fallback", {}),
         "recovery_options": ["direct_policy_url", "paste_text", "upload_pdf"] if not chunks else [],
+        "session_token": session_token,
     }
 
 
@@ -420,19 +432,20 @@ async def ingest_text(
         scope="ingest",
         limit=settings.ingestion_client_rate_limit,
     )
-    owner_id = get_or_create_owner_id(http_request, response)
+    owner_id, session_token = _ingestion_session(http_request, response)
     check_rate_limit(
         http_request,
         scope="ingest",
         limit=settings.ingestion_owner_rate_limit,
     )
 
-    return await asyncio.to_thread(
+    result = await asyncio.to_thread(
         _ingest_text_document,
         request.text,
         request.title,
         owner_id,
     )
+    return {**result, "session_token": session_token}
 
 
 @app.post("/api/v1/ingest/pdf")
@@ -452,7 +465,7 @@ async def ingest_pdf(
         scope="ingest",
         limit=settings.ingestion_client_rate_limit,
     )
-    owner_id = get_or_create_owner_id(http_request, response)
+    owner_id, session_token = _ingestion_session(http_request, response)
     check_rate_limit(
         http_request,
         scope="ingest",
@@ -463,12 +476,13 @@ async def ingest_pdf(
     filename = _metadata_filename(file.filename)
 
     try:
-        return await asyncio.to_thread(
+        result = await asyncio.to_thread(
             _ingest_pdf_document,
             content,
             filename,
             owner_id,
         )
+        return {**result, "session_token": session_token}
     except PDFProcessingError as exc:
         raise HTTPException(
             status_code=400,
@@ -483,9 +497,8 @@ async def ask_question(request: QuestionRequest, http_request: Request):
         scope="ask",
         limit=settings.ask_rate_limit,
     )
-    owner_id = require_owner_id(http_request, log_failure=True)
+    owner_id = require_owner_id(http_request)
     if owner_id is None:
-        logger.warning("ask_document_not_found reason=invalid_session")
         raise HTTPException(
             status_code=404,
             detail=DOCUMENT_NOT_FOUND_DETAIL,
@@ -505,10 +518,6 @@ async def ask_question(request: QuestionRequest, http_request: Request):
             detail="Question answering is temporarily unavailable. Please retry later.",
         ) from exc
     if not result["sources"] and not result.get("document_found"):
-        logger.warning(
-            "ask_document_not_found reason=no_owner_scoped_vectors document_id=%r",
-            request.document_id,
-        )
         raise HTTPException(
             status_code=404,
             detail=DOCUMENT_NOT_FOUND_DETAIL,

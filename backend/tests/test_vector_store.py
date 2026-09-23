@@ -179,6 +179,7 @@ def test_search_chunks_filters_by_document_id():
 
         assert len(results) == 1
         assert results[0]["document_id"] == "test-document"
+        assert "owner_id" not in results[0]
         assert results[0]["chunk_index"] == 0
         assert results[0]["text"] == "First chunk"
         assert results[0]["filename"] == "test.pdf"

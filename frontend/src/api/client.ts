@@ -7,6 +7,7 @@ import type {
 } from './types'
 
 const configuredBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim()
+export const SESSION_HEADER_NAME = 'X-PolicyCue-Session'
 // Keep the Vite and API origins on localhost in development.  `localhost` and
 // `127.0.0.1` are different sites for SameSite cookies, so mixing them loses
 // the server-issued anonymous owner session between ingestion and /ask.
@@ -103,16 +104,17 @@ export function ingestText(text: string, title?: string, signal?: AbortSignal) {
   })
 }
 
-export function askQuestion(documentId: string, question: string) {
+export function askQuestion(documentId: string, question: string, sessionToken: string) {
   return request<AnswerResponse>('/api/v1/ask', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', [SESSION_HEADER_NAME]: sessionToken },
     body: JSON.stringify({ document_id: documentId, question, top_k: 5 }),
   })
 }
 
-export function deleteAnalysis(documentId: string) {
+export function deleteAnalysis(documentId: string, sessionToken: string) {
   return request<DeleteResponse>(`/api/v1/documents/${encodeURIComponent(documentId)}`, {
     method: 'DELETE',
+    headers: { [SESSION_HEADER_NAME]: sessionToken },
   })
 }

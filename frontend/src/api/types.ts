@@ -26,6 +26,7 @@ export interface WebsiteIngestion {
   fallback_used: 'none' | 'apify'
   fallback: Record<string, unknown>
   recovery_options: string[]
+  session_token: string
 }
 
 export interface PdfIngestion {
@@ -33,6 +34,7 @@ export interface PdfIngestion {
   document_id: string
   filename: string | null
   chunks: number
+  session_token: string
 }
 
 export interface TextIngestion {
@@ -41,13 +43,13 @@ export interface TextIngestion {
   source_type: 'text'
   title: string
   chunks: number
+  session_token: string
 }
 
 export interface AnswerSource {
   score: number
   text: string
   document_id: string
-  owner_id?: string
   chunk_index: number
   source?: string
   source_url?: string
@@ -88,5 +90,6 @@ export interface ActiveAnalysis {
   documentId: string
   identity: string
   chunks: number
+  sessionToken: string
   result: IngestionResult
 }

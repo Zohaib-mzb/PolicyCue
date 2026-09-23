@@ -178,7 +178,6 @@ def search_chunks(
             "score": match["score"],
             "text": match["metadata"]["text"],
             "document_id": match["metadata"]["document_id"],
-            "owner_id": match["metadata"].get("owner_id", ""),
             "chunk_index": match["metadata"]["chunk_index"],
             "source": match["metadata"].get(
                 "source",

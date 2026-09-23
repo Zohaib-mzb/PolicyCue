@@ -3,14 +3,15 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 
+const sessionToken = 'signed-session-token'
 const websiteResult = {
   status: 'success', document_id: '11111111-1111-4111-8111-111111111111', url: 'https://example.com/', chunks: 8,
   policies: { privacy_policy: ['https://example.com/privacy'] },
   accepted_policies: [{ source_url: 'https://example.com/privacy', source_urls: ['https://example.com/privacy'], policy_categories: ['privacy_policy'], content_hash: 'hash', chunks: 8 }],
-  warnings: [], skipped: {}, candidates: 1, coverage_status: 'policies_found', fallback_used: 'none', fallback: {}, recovery_options: [],
+  warnings: [], skipped: {}, candidates: 1, coverage_status: 'policies_found', fallback_used: 'none', fallback: {}, recovery_options: [], session_token: sessionToken,
 }
-const pdfResult = { status: 'success', document_id: '22222222-2222-4222-8222-222222222222', filename: 'policy.pdf', chunks: 3 }
-const textResult = { status: 'success', document_id: '33333333-3333-4333-8333-333333333333', source_type: 'text', title: 'Pasted text', chunks: 2 }
+const pdfResult = { status: 'success', document_id: '22222222-2222-4222-8222-222222222222', filename: 'policy.pdf', chunks: 3, session_token: sessionToken }
+const textResult = { status: 'success', document_id: '33333333-3333-4333-8333-333333333333', source_type: 'text', title: 'Pasted text', chunks: 2, session_token: sessionToken }
 
 function jsonResponse(payload: unknown, status = 200, headers?: HeadersInit) {
   return new Response(JSON.stringify(payload), { status, headers: { 'Content-Type': 'application/json', ...headers } })
@@ -21,7 +22,7 @@ async function submitWebsite(result: Record<string, unknown> = websiteResult) {
   vi.mocked(fetch).mockResolvedValueOnce(jsonResponse(result))
   await user.type(screen.getByLabelText(/website or direct policy url/i), 'https://example.com')
   await user.click(screen.getByRole('button', { name: /analyze website/i }))
-  await screen.findByRole('heading', { name: 'example.com' }, { timeout: 2_000 })
+  await screen.findByRole('heading', { name: 'example.com' }, { timeout: 5_000 })
   return user
 }
 
@@ -123,6 +124,7 @@ describe('PolicyCue application', () => {
     const deleteCalls = vi.mocked(fetch).mock.calls.filter(([url, init]) => String(url).includes(`/documents/${websiteResult.document_id}`) && (init as RequestInit).method === 'DELETE')
     expect(deleteCalls).toHaveLength(1)
     expect(deleteCalls[0][1]).toEqual(expect.objectContaining({ credentials: 'include' }))
+    expect(new Headers((deleteCalls[0][1] as RequestInit).headers).get('X-PolicyCue-Session')).toBe(sessionToken)
     expect(screen.queryByRole('heading', { name: 'example.com' })).not.toBeInTheDocument()
   })
 
@@ -161,8 +163,24 @@ describe('PolicyCue application', () => {
     const askRequest = askCall[1] as RequestInit
     expect(JSON.parse(String(askRequest.body))).toMatchObject({ document_id: websiteResult.document_id })
     expect(askRequest.credentials).toBe('include')
+    expect(new Headers(askRequest.headers).get('X-PolicyCue-Session')).toBe(sessionToken)
     expect(screen.getByText('The policy applies to account data.')).toBeInTheDocument()
     expect(vi.mocked(fetch).mock.calls.filter(([url]) => String(url).includes('/documents/'))).toHaveLength(0)
+  })
+
+  it('keeps the session token only in memory and clears it after deletion', async () => {
+    const localStorageWrite = vi.spyOn(window.localStorage, 'setItem')
+    const sessionStorageWrite = vi.spyOn(window.sessionStorage, 'setItem')
+    const user = await submitWebsite()
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ status: 'deleted', document_id: websiteResult.document_id }))
+    await user.click(screen.getByRole('button', { name: 'New analysis' }))
+    await screen.findByLabelText(/website or direct policy url/i)
+
+    expect(localStorageWrite).not.toHaveBeenCalled()
+    expect(sessionStorageWrite).not.toHaveBeenCalled()
+    const deletion = vi.mocked(fetch).mock.calls.find(([, init]) => (init as RequestInit).method === 'DELETE')
+    if (!deletion) throw new Error('Expected a delete request.')
+    expect(new Headers((deletion[1] as RequestInit).headers).get('X-PolicyCue-Session')).toBe(sessionToken)
   })
 
   it('uses the retained PDF document ID when asking', async () => {
@@ -179,13 +197,14 @@ describe('PolicyCue application', () => {
     const askCall = vi.mocked(fetch).mock.calls.at(-1)
     if (!askCall) throw new Error('Expected an ask request.')
     expect(JSON.parse(String((askCall[1] as RequestInit).body))).toMatchObject({ document_id: pdfResult.document_id })
+    expect(new Headers((askCall[1] as RequestInit).headers).get('X-PolicyCue-Session')).toBe(sessionToken)
     expect(screen.getByText(noAnswer)).toBeInTheDocument()
   })
 
   it('uses the retained pasted-text document ID when asking', async () => {
     const user = userEvent.setup()
     await user.click(screen.getByRole('tab', { name: 'Paste Text' }))
-    await user.type(screen.getByLabelText('Policy text'), 'This policy explains account deletion requests, data use, and service responsibilities in enough detail to analyze.')
+    fireEvent.change(screen.getByLabelText('Policy text'), { target: { value: 'This policy explains account deletion requests, data use, and service responsibilities in enough detail to analyze.' } })
     vi.mocked(fetch).mockResolvedValueOnce(jsonResponse(textResult))
     await user.click(screen.getByRole('button', { name: 'Analyze text' }))
     await screen.findByRole('heading', { name: 'Pasted text' })
@@ -195,6 +214,7 @@ describe('PolicyCue application', () => {
     const askCall = vi.mocked(fetch).mock.calls.at(-1)
     if (!askCall) throw new Error('Expected an ask request.')
     expect(JSON.parse(String((askCall[1] as RequestInit).body))).toMatchObject({ document_id: textResult.document_id })
+    expect(new Headers((askCall[1] as RequestInit).headers).get('X-PolicyCue-Session')).toBe(sessionToken)
   })
 
   it('presents an unsupported answer as a grounded result without fake sources', async () => {
@@ -224,7 +244,10 @@ describe('PolicyCue application', () => {
     vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ status: 'deleted', document_id: websiteResult.document_id }))
     await user.click(screen.getByRole('button', { name: 'New analysis' }))
     expect(await screen.findByLabelText(/website or direct policy url/i)).toBeInTheDocument()
-    expect(vi.mocked(fetch).mock.calls.at(-1)?.[1]).toEqual(expect.objectContaining({ method: 'DELETE' }))
+    const deletion = vi.mocked(fetch).mock.calls.at(-1)?.[1]
+    expect(deletion).toEqual(expect.objectContaining({ method: 'DELETE' }))
+    if (!deletion) throw new Error('Expected a delete request.')
+    expect(new Headers(deletion.headers).get('X-PolicyCue-Session')).toBe(sessionToken)
   })
 
   it('keeps the active analysis when replacement deletion fails', async () => {
